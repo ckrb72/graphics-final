@@ -111,15 +111,24 @@
             A / D - left / right<br>
             Space / Left Shift - up / down <br>
         </div>
-        <div id="post-processing-effects">
-            <p>Post-Processing:</p>
-            <select id="post-process-dropdown">
-                <option value="none">None</option>
-                <option value="grayscale">Grayscale</option>
-                <option value="invert">Invert Colors</option>
-                <option value="blur">Blur</option>
-                <option value="edge-detection">Edge Detection</option>
-            </select>
+        <div id="settings">
+            <div id="post-processing">
+                <p>Post-Processing:</p>
+                <select id="post-process-dropdown">
+                    <option value="none">None</option>
+                    <option value="grayscale">Grayscale</option>
+                    <option value="invert">Invert Colors</option>
+                    <option value="blur">Blur</option>
+                    <option value="edge-detection">Edge Detection</option>
+                </select>
+            </div>
+
+            <div id="light-settings">
+                <p>Light:</p>
+                <label for="color-picker">Light Color:</label>
+                <input type="color" name="color-picker" value="#ffffff" />
+                <p>Light Pos:</p>
+            </div>
         </div>
     </div>
 </body>
