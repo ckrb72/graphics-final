@@ -1,0 +1,28 @@
+body {
+    margin: 0;
+    background-color:lightgray
+}
+
+#webgl-canvas {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#text-content {
+    display: flex;
+}
+
+#instructions {
+    text-align: center;
+    width: 50%;
+}
+
+#post-processing-effects {
+    display: flex;
+    width: 50%;
+}
+
+#post-process-dropdown {
+    width: 50%;
+}

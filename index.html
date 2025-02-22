@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="./initShaders.js"></script>
+    <script src="./MV.js"></script>
+    <script src="./main.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <script id="vertex-shader" type="text">#version 300 es
+        layout(location = 0) in vec3 pos;
+        layout(location = 1) in vec3 v_color;
+
+        out vec3 f_color;
+
+        uniform mat4 projection;
+        uniform mat4 view;
+        uniform mat4 model;
+
+        void main()
+        {
+            gl_Position = projection * view * model * vec4(pos, 1.0);
+            f_color = v_color;
+        }
+    </script>
+
+    <script id="fragment-shader" type="text">#version 300 es
+        precision mediump float;
+
+        in vec3 f_color;
+
+        out vec4 final_color;
+        void main()
+        {
+            final_color = vec4(f_color, 1.0);
+        }
+    </script>
+
+
+    <script id="square-vertex" type="text">#version 300 es
+        layout(location = 0) in vec2 pos;
+        layout(location = 1) in vec2 v_tex;
+
+        out vec2 f_tex;
+
+        void main()
+        {
+            gl_Position = vec4(pos, 0.0, 1.0);
+            f_tex = v_tex;
+        }
+
+    </script>
+
+    <script id="none-fragment" type="text">#version 300 es
+        precision mediump float;
+        in vec2 f_tex;
+        out vec4 final_color;
+
+        uniform sampler2D frame_tex;
+
+        void main()
+        {
+            final_color = texture(frame_tex, f_tex);
+        }
+
+    </script>
+
+    <script id="grayscale-fragment" type="text">#version 300 es
+        precision mediump float;
+        in vec2 f_tex;
+        out vec4 final_color;
+
+        uniform sampler2D frame_tex;
+        void main()
+        {
+            vec4 tex_color = texture(frame_tex, f_tex);
+
+            // Could just average colors together but found a better grayscale formula at https://www.sciencedirect.com/topics/engineering/grayscale-image#:~:text=In%20digital%20images%2C%20grayscale%20means,which%20gray%20has%20multiple%20levels.
+            // Takes into account how our eyes percieve red, green and blue intensities differently
+            float intensity = 0.2989 * tex_color.r + 0.5870 * tex_color.g + 0.1140 * tex_color.b;
+            final_color = vec4(vec3(intensity), 1.0);
+        }
+    </script>
+
+    <script id="invert-fragment" type="text">#version 300 es
+        precision mediump float;
+        in vec2 f_tex;
+        out vec4 final_color;
+
+        uniform sampler2D frame_tex;
+        void main()
+        {
+            vec3 inverted_color = vec3(1.0 - texture(frame_tex, f_tex));
+            final_color = vec4(inverted_color, 1.0);
+        }
+
+    </script>
+
+    <canvas id="webgl-canvas">WebGL2 Not Found!</canvas>
+
+    <div id="text-content">
+        <div id="instructions">
+            <p>Controls (Must be in locked mode to move):</p>
+            Click the Canvas to lock mouse <br>
+            Move mouse around in locked mode to move camera<br>
+            ESC - leave locked mouse mode<br>
+            W / S - forward / backward<br>
+            A / D - left / right<br>
+            Space / Left Shift - up / down <br>
+        </div>
+        <div id="post-processing-effects">
+            <p>Post-Processing:</p>
+            <select id="post-process-dropdown">
+                <option value="none">None</option>
+                <option value="grayscale">Grayscale</option>
+                <option value="invert">Invert Colors</option>
+                <option value="blur">Blur</option>
+                <option value="edge-detection">Edge Detection</option>
+            </select>
+        </div>
+    </div>
+</body>
+</html>
