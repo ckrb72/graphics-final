@@ -113,7 +113,7 @@ function main()
     var model_loc = gl.getUniformLocation(program, "model");
     var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 100.0);
     var projection_loc = gl.getUniformLocation(program, "projection");
-    var cam_pos = vec3(0.0, 0.0, 3.0);
+    var cam_pos = vec3(0.0, 0.0, 5.0);
     var cam_dir = vec3(0.0, 0.0, -1.0);
     var camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
     var view_loc = gl.getUniformLocation(program, "view");
@@ -151,12 +151,17 @@ function main()
         {
             mouse_theta += event.movementX * MOUSE_SENSITIVITY;
             mouse_phi += event.movementY * MOUSE_SENSITIVITY;
-            if(mouse_phi >= 179.0) mouse_phi = 179.0;
-            if(mouse_phi <= -179.0) mouse_phi = -179.0;
+            if(mouse_phi >= 89.0) mouse_phi = 89.0;
+            if(mouse_phi <= -89.0) mouse_phi = -89.0;
         }
     });
 
-    const delta = 0.01;
+    
+    var cam_radius = 5.0;
+    /*
+    canvas.addEventListener("wheel", (event) => {
+        cam_radius += event.deltaY * 0.001;
+    });*/
 
     var selected_shader = none_shader;
     const shader_map = new Map();
@@ -174,52 +179,56 @@ function main()
 
     var post_process = document.getElementById('post-process-dropdown');
     post_process.addEventListener('change', () => {
-        console.log(post_process.value);
         selected_shader = shader_map.get(post_process.value);
     });
 
+    var cam_type_dropdown = document.getElementById("camera-dropdown");
+    var cam_type = cam_type_dropdown.value;
+    cam_type_dropdown.addEventListener('change', () => {
+        cam_type = cam_type_dropdown.value;
+        cam_pos = vec3(0.0, 0.0, 5.0);
+    });
+
+    parse_model("./Table.json", gl).then(value => {
+        console.log(value);
+    });
+
+    var previous_time = Date.now();
+    var delta = 0.0;
     var render = function()
     {
+        var current_time = Date.now();
+        delta = (current_time - previous_time) * 0.001;
+        previous_time = current_time;
         if(document.pointerLockElement === canvas)
         {
-            cam_dir[0] = Math.sin(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
-            cam_dir[1] = -Math.sin(radians(mouse_phi));
-            cam_dir[2] = Math.cos(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
+            switch(cam_type)
+            {
+                case 'first-person':
+                    cam_dir[0] = Math.sin(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
+                    cam_dir[1] = -Math.sin(radians(mouse_phi));
+                    cam_dir[2] = Math.cos(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
+                
+                    cam_dir = normalize(cam_dir);
+                    var scaled_dir = scale(delta, cam_dir);
 
-            cam_dir = normalize(cam_dir);
-            var scaled_dir = scale(delta, cam_dir);
-
-            if(input_map.get('w') == 1)
-            {
-                cam_pos = add(cam_pos, scaled_dir);
+                    if(input_map.get('w') == 1) cam_pos = add(cam_pos, scaled_dir);
+                    if(input_map.get('s') == 1) cam_pos = subtract(cam_pos, scaled_dir);
+                    if(input_map.get(' ') == 1) cam_pos[1] += delta;
+                    if(input_map.get('shift') == 1) cam_pos[1] -= delta;
+                    if(input_map.get('a') == 1) cam_pos = subtract(cam_pos, scale(delta, normalize(cross(cam_dir, vec3(0.0, 1.0, 0.0)))));
+                    if(input_map.get('d') == 1) cam_pos = add(cam_pos, scale(delta, normalize(cross(cam_dir, vec3(0.0, 1.0, 0.0)))));
+                    camera = lookAt(cam_pos, add(cam_pos, cam_dir), vec3(0.0, 1.0, 0.0));
+                    break;
+                case 'orbit':
+                    cam_pos[0] = cam_radius * Math.sin(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
+                    cam_pos[1] = cam_radius * Math.sin(radians(mouse_phi));
+                    cam_pos[2] = cam_radius * Math.cos(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
+                    camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+                    break;
+                default:
+                    break;
             }
-        
-            if(input_map.get('s') == 1)
-            {
-                cam_pos = subtract(cam_pos, scaled_dir);
-            }
-        
-            if(input_map.get(' ') == 1)
-            {
-                cam_pos[1] += delta;
-            }
-        
-            if(input_map.get('shift') == 1)
-            {
-                cam_pos[1] -= delta;
-            }
-        
-            if(input_map.get('a') == 1)
-            {
-                cam_pos = subtract(cam_pos, scale(delta, normalize(cross(cam_dir, vec3(0.0, 1.0, 0.0)))));
-            }
-        
-            if(input_map.get('d') == 1)
-            {
-                cam_pos = add(cam_pos, scale(delta, normalize(cross(cam_dir, vec3(0.0, 1.0, 0.0)))));
-            }
-
-            camera = lookAt(cam_pos, add(cam_pos, cam_dir), vec3(0.0, 1.0, 0.0));
         }
 
 
@@ -268,3 +277,39 @@ function main()
 }
 
 window.addEventListener("load", main);
+
+async function parse_model(path, gl)
+{
+    try
+    {
+        const response = await fetch(path);
+        if(!response.ok)
+        {
+            throw new Error('failed to open file');
+        }
+
+        const json = await response.json();
+
+        var pos_buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, pos_buf);
+        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.position.array, gl.STATIC_DRAW);
+        
+        var norm_buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, norm_buf);
+        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.normal.array, gl.STATIC_DRAW);
+
+        var uv_buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
+        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.uv.array, gl.STATIC_DRAW);
+        var model = {};
+        model.triangle_count = json.geometries[0].data.attributes.position.array.length / 3;
+        model.position = pos_buf;
+        model.normal = norm_buf;
+        model.uv = uv_buf;
+        return model;
+    }
+    catch (error)
+    {
+        console.error(error.message);
+    }
+}
