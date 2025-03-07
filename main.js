@@ -45,9 +45,7 @@ function main()
 
     var none_shader = initShaders(gl, 'square-vertex', 'none-fragment');
     var square_pos_attrib = gl.getAttribLocation(none_shader, "pos");
-    gl.enableVertexAttribArray(square_pos_attrib);
     var square_tex_attrib = gl.getAttribLocation(none_shader, "v_tex");
-    gl.enableVertexAttribArray(square_tex_attrib);
 
     var frame_tex_loc = gl.getUniformLocation(none_shader, "frame_tex");
     gl.useProgram(none_shader);
@@ -78,12 +76,7 @@ function main()
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    var pos_attrib = gl.getAttribLocation(program, "pos");
-    gl.enableVertexAttribArray(pos_attrib);
-
-    var color_attrib = gl.getAttribLocation(program, "v_color");
-    gl.enableVertexAttribArray(color_attrib);
-
+    var pos_attrib = gl.getAttribLocation(program, "v_pos");
 
     var indices = new Uint32Array([
         0, 1, 2,
@@ -110,6 +103,7 @@ function main()
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     var model = mat4(1.0);
+    model = scalem(0.5, 0.5, 0.5);
     var model_loc = gl.getUniformLocation(program, "model");
     var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 100.0);
     var projection_loc = gl.getUniformLocation(program, "projection");
@@ -158,21 +152,12 @@ function main()
 
     
     var cam_radius = 5.0;
-    /*
-    canvas.addEventListener("wheel", (event) => {
-        cam_radius += event.deltaY * 0.001;
-    });*/
-
     var selected_shader = none_shader;
     const shader_map = new Map();
     shader_map.set('none', none_shader);
 
     var grayscale_shader = initShaders(gl, 'square-vertex', 'grayscale-fragment');
     var inverted_shader = initShaders(gl, 'square-vertex', 'invert-fragment');
-    /*var grayscale_pos_attrib = gl.getAttribLocation(grayscale_shader, "pos");
-    gl.enableVertexAttribArray(grayscale_pos_attrib);
-    var grayscale_tex_attrib = gl.getAttribLocation(grayscale_shader, "v_tex");
-    gl.enableVertexAttribArray(grayscale_tex_attrib);*/
 
     shader_map.set('grayscale', grayscale_shader);
     shader_map.set('invert', inverted_shader);
@@ -189,8 +174,9 @@ function main()
         cam_pos = vec3(0.0, 0.0, 5.0);
     });
 
-    parse_model("./Table.json", gl).then(value => {
-        console.log(value);
+    var table_model = {};
+    parse_model("./Table.json", gl).then(model => {
+        table_model = model;
     });
 
     var previous_time = Date.now();
@@ -238,8 +224,6 @@ function main()
 
         gl.useProgram(program);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
 
         var rotated_model = mult(rotate(theta, vec3(0.0, 1.0, 0.0)), model);
         theta += 10 * delta;
@@ -248,9 +232,16 @@ function main()
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
 
+        gl.enableVertexAttribArray(pos_attrib);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
+
         gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 6 * 4, 0);
-        gl.vertexAttribPointer(color_attrib, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
+        //gl.vertexAttribPointer(color_attrib, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+
+        gl.disableVertexAttribArray(pos_attrib);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -264,9 +255,18 @@ function main()
         gl.bindBuffer(gl.ARRAY_BUFFER, square_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, square_index_buffer);
 
+        gl.enableVertexAttribArray(square_pos_attrib);
+        gl.enableVertexAttribArray(square_tex_attrib);
+
         gl.vertexAttribPointer(square_pos_attrib, 2, gl.FLOAT, false, 4 * 4, 0);
         gl.vertexAttribPointer(square_tex_attrib, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
         gl.drawElements(gl.TRIANGLES, square_indices.length, gl.UNSIGNED_INT, 0);
+
+        gl.disableVertexAttribArray(square_pos_attrib);
+        gl.disableVertexAttribArray(square_tex_attrib);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
 
         setTimeout( () => { window.requestAnimationFrame(render) }, 0);
@@ -289,23 +289,28 @@ async function parse_model(path, gl)
         }
 
         const json = await response.json();
+        var model = {};
 
         var pos_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, pos_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.position.array, gl.STATIC_DRAW);
-        
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.position.array), gl.STATIC_DRAW);
+    
         var norm_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, norm_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.normal.array, gl.STATIC_DRAW);
-
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.normal.array), gl.STATIC_DRAW);
+    
         var uv_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, json.geometries[0].data.attributes.uv.array, gl.STATIC_DRAW);
-        var model = {};
-        model.triangle_count = json.geometries[0].data.attributes.position.array.length / 3;
-        model.position = pos_buf;
-        model.normal = norm_buf;
-        model.uv = uv_buf;
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.uv.array), gl.STATIC_DRAW);
+    
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    
+        model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
+        model.pos_buf = pos_buf;
+        model.norm_buf = norm_buf;
+        model.uv_buf = uv_buf;
+
+
         return model;
     }
     catch (error)
