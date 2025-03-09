@@ -58,47 +58,6 @@ function main()
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, square_indices, gl.STATIC_DRAW);
 
 
-    var vertices = new Float32Array([
-        -0.5, -0.5, 0.5,    0.0, 0.0, 1.0,
-        0.5, -0.5, 0.5,     1.0, 0.0, 0.0,
-        0.5, 0.5, 0.5,      0.0, 1.0, 0.0,
-        -0.5, 0.5, 0.5,     1.0, 1.0, 1.0,
-
-        -0.5, -0.5, -0.5,   0.0, 0.0, 0.0,
-        0.5, -0.5, -0.5,    0.0, 0.0, 1.0,
-        0.5, 0.5, -0.5,     0.0, 1.0, 0.0,
-        -0.5, 0.5, -0.5,    1.0, 0.0, 0.0
-    ]);
-
-    var vertex_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-
-    var indices = new Uint32Array([
-        0, 1, 2,
-        2, 3, 0,
-        
-        4, 5, 6,
-        6, 7, 4,
-
-        3, 2, 6,
-        6, 7, 3,
-
-        0, 1, 5,
-        5, 4, 0,
-
-        1, 5, 6,
-        6, 2, 1,
-
-        4, 0, 3,
-        3, 7, 4
-    ]);
-
-    var index_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-
     var program = initShaders(gl, 'vertex-shader', 'fragment-shader');
 
     var pos_attrib = gl.getAttribLocation(program, "v_pos");
@@ -186,17 +145,23 @@ function main()
     });
 
     var model_arr = [];
-    parse_model("./Table.json", gl).then(model => {
+    parse_model("./Table.json", gl).then(meshes => {
         const scene_object = {
-            model: model,
+            meshes: meshes,
             transform: {
                 scale: 1.0,
                 position: vec3(0.0, 0.0, 0.0),
-                rotation: vec4(1.0, 0.0, 0.0, 0.0)
+                rotation: {
+                    angle: 0.0,
+                    axis: vec3(0.0, 1.0, 0.0)
+                }
             }
         };
         model_arr.push(scene_object);
     });
+
+    // Have to do this since the image data is flipped when loading from the json
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     var previous_time = Date.now();
     var delta = 0.0;
@@ -254,31 +219,25 @@ function main()
         gl.enableVertexAttribArray(tex_attrib);
 
         model_arr.forEach((item) => {
-
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, item.model.ambient_map);
-
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, item.model.normal_map);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.pos_buf);
-            gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.norm_buf);
-            gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.uv_buf);
-            gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
-
-            gl.drawArrays(gl.TRIANGLES, 0, item.model.vert_count);
+            item.meshes.forEach((mesh) => {
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+    
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
+    
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.pos_buf);
+                gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+    
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.norm_buf);
+                gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+    
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.uv_buf);
+                gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
+    
+                gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
+            });
         });
-
-        /*gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-
-        gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 6 * 4, 0);
-        //gl.vertexAttribPointer(color_attrib, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
-        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);*/
 
         gl.disableVertexAttribArray(pos_attrib);
         gl.disableVertexAttribArray(norm_attrib);
@@ -330,7 +289,6 @@ async function parse_model(path, gl)
         }
 
         const json = await response.json();
-        var model = {};
 
         // Load buffers
         var pos_buf = gl.createBuffer();
@@ -380,15 +338,25 @@ async function parse_model(path, gl)
             });
         }
     
-        model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
+        // One model can have many meshes
+        var meshes = [];
+        meshes.push({
+            vert_count: json.geometries[0].data.attributes.position.array.length / 3,
+            pos_buf: pos_buf,
+            norm_buf: norm_buf,
+            uv_buf: uv_buf,
+            normal_map: normal_tex,
+            ambient_map: ambient_tex
+        });
+        /*model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
         model.pos_buf = pos_buf;
         model.norm_buf = norm_buf;
         model.uv_buf = uv_buf;
         model.normal_map = normal_tex;
-        model.ambient_map = ambient_tex;
+        model.ambient_map = ambient_tex;*/
 
 
-        return model;
+        return meshes;
     }
     catch (error)
     {
