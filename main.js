@@ -29,8 +29,6 @@ function main()
         alert('WebGL2 Not Supported');
     }
 
-    var program = initShaders(gl, 'vertex-shader', 'fragment-shader');
-
     var square_vertices = new Float32Array([
         -1.0, -1.0,     0.0, 0.0,
         1.0, -1.0,      1.0, 0.0,
@@ -101,15 +99,29 @@ function main()
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
-    var model = mat4(1.0);
-    model = scalem(0.3, 0.3, 0.3);
+    var program = initShaders(gl, 'vertex-shader', 'fragment-shader');
+
+    var pos_attrib = gl.getAttribLocation(program, "v_pos");
+    var norm_attrib = gl.getAttribLocation(program, "v_norm");
+    var tex_attrib = gl.getAttribLocation(program, "v_tex");
+
     var model_loc = gl.getUniformLocation(program, "model");
-    var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
     var projection_loc = gl.getUniformLocation(program, "projection");
+    var view_loc = gl.getUniformLocation(program, "view");
+
+    var ambient_map_loc = gl.getUniformLocation(program, "ambient_map");
+    var normal_map_loc = gl.getUniformLocation(program, "normal_map");
+
+    gl.useProgram(program);
+    gl.uniform1i(ambient_map_loc, 0);
+    gl.uniform1i(normal_map_loc, 1);
+
+    var model = mat4(1.0);
+    model = scalem(0.1, 0.1, 0.1);
+    var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
     var cam_pos = vec3(0.0, 0.0, 5.0);
     var cam_dir = vec3(0.0, 0.0, -1.0);
     var camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
-    var view_loc = gl.getUniformLocation(program, "view");
     var theta = 0.0;
 
     var framebuffer = gl.createFramebuffer();
@@ -186,8 +198,6 @@ function main()
         model_arr.push(scene_object);
     });
 
-    var pos_attrib = gl.getAttribLocation(program, "v_pos");
-
     var previous_time = Date.now();
     var delta = 0.0;
     var render = function()
@@ -234,28 +244,45 @@ function main()
 
 
         var rotated_model = mult(rotate(theta, vec3(0.0, 1.0, 0.0)), model);
-        theta += 10 * delta;
+        theta = -90.0;
         gl.uniformMatrix4fv(model_loc, false, flatten(rotated_model));
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
 
         gl.enableVertexAttribArray(pos_attrib);
+        gl.enableVertexAttribArray(norm_attrib);
+        gl.enableVertexAttribArray(tex_attrib);
 
         model_arr.forEach((item) => {
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, item.model.ambient_map);
+
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, item.model.normal_map);
+
             gl.bindBuffer(gl.ARRAY_BUFFER, item.model.pos_buf);
             gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.norm_buf);
+            gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.uv_buf);
+            gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
 
             gl.drawArrays(gl.TRIANGLES, 0, item.model.vert_count);
         });
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+        /*gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
 
         gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 6 * 4, 0);
         //gl.vertexAttribPointer(color_attrib, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
-        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);*/
 
         gl.disableVertexAttribArray(pos_attrib);
+        gl.disableVertexAttribArray(norm_attrib);
+        gl.disableVertexAttribArray(tex_attrib);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -305,6 +332,7 @@ async function parse_model(path, gl)
         const json = await response.json();
         var model = {};
 
+        // Load buffers
         var pos_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, pos_buf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.position.array), gl.STATIC_DRAW);
@@ -318,11 +346,46 @@ async function parse_model(path, gl)
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.uv.array), gl.STATIC_DRAW);
     
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        // Load Textures
+
+        // Get the textures from the json
+        var ambient_tex = gl.createTexture();
+        var normal_tex = gl.createTexture();
+        {
+            // Get the corresponding textures for each map in the material
+            var ambient_image_id = find_uuid(json.textures, json.materials[0].map).image;
+            var normal_image_id = find_uuid(json.textures, json.materials[0].normalMap).image;
+
+            // Get the corresponding images for each textures
+            var ambient_image_url = find_uuid(json.images, ambient_image_id).url;
+            var normal_image_url = find_uuid(json.images, normal_image_id).url;
+
+            var ambient_image = new Image();
+            ambient_image.src = ambient_image_url;
+
+            ambient_image.addEventListener('load', () => {
+                gl.bindTexture(gl.TEXTURE_2D, ambient_tex);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ambient_image);
+                gl.generateMipmap(gl.TEXTURE_2D);
+            });
+
+            var normal_image = new Image();
+            normal_image.src = normal_image_url;
+
+            normal_image.addEventListener('load', () => {
+                gl.bindTexture(gl.TEXTURE_2D, normal_tex);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, normal_image);
+                gl.generateMipmap(gl.TEXTURE_2D);
+            });
+        }
     
         model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
         model.pos_buf = pos_buf;
         model.norm_buf = norm_buf;
         model.uv_buf = uv_buf;
+        model.normal_map = normal_tex;
+        model.ambient_map = ambient_tex;
 
 
         return model;
@@ -331,4 +394,12 @@ async function parse_model(path, gl)
     {
         console.error(error.message);
     }
+}
+
+
+function find_uuid(arr, uuid)
+{
+    return arr.filter( (item) => {
+        return item.uuid === uuid;
+    })[0];
 }

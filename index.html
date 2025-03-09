@@ -13,29 +13,41 @@
     <script id="vertex-shader" type="text">#version 300 es
         layout(location = 0) in vec3 v_pos;
         layout(location = 1) in vec3 v_norm;
+        layout(location = 2) in vec2 v_tex;
 
         uniform mat4 projection;
         uniform mat4 view;
         uniform mat4 model;
 
         out vec3 f_norm;
+        out vec2 f_tex;
 
         void main()
         {
             gl_Position = projection * view * model * vec4(v_pos, 1.0);
-            f_norm = v_norm;
+            f_norm = mat3(inverse(transpose(model))) * v_norm;      // Transform normals to world space
+            f_tex = v_tex;
         }
     </script>
 
     <script id="fragment-shader" type="text">#version 300 es
         precision mediump float;
 
+        // Doing lighting in world space
+
         in vec3 f_norm;
+        in vec2 f_tex;
+
+        uniform sampler2D ambient_map;
+        uniform sampler2D normal_map;
 
         out vec4 final_color;
         void main()
         {
-            final_color = vec4(1.0, 1.0, 1.0, 1.0);
+            //final_color = vec4(1.0, 1.0, 1.0, 1.0);
+            //final_color = vec4(f_norm, 1.0);
+            //final_color = vec4(f_tex, 0.0, 1.0);
+            final_color = texture(normal_map, f_tex);
         }
     </script>
 
