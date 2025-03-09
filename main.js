@@ -76,7 +76,6 @@ function main()
     gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    var pos_attrib = gl.getAttribLocation(program, "v_pos");
 
     var indices = new Uint32Array([
         0, 1, 2,
@@ -103,9 +102,9 @@ function main()
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
     var model = mat4(1.0);
-    model = scalem(0.5, 0.5, 0.5);
+    model = scalem(0.3, 0.3, 0.3);
     var model_loc = gl.getUniformLocation(program, "model");
-    var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 100.0);
+    var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
     var projection_loc = gl.getUniformLocation(program, "projection");
     var cam_pos = vec3(0.0, 0.0, 5.0);
     var cam_dir = vec3(0.0, 0.0, -1.0);
@@ -174,10 +173,20 @@ function main()
         cam_pos = vec3(0.0, 0.0, 5.0);
     });
 
-    var table_model = {};
+    var model_arr = [];
     parse_model("./Table.json", gl).then(model => {
-        table_model = model;
+        const scene_object = {
+            model: model,
+            transform: {
+                scale: 1.0,
+                position: vec3(0.0, 0.0, 0.0),
+                rotation: vec4(1.0, 0.0, 0.0, 0.0)
+            }
+        };
+        model_arr.push(scene_object);
     });
+
+    var pos_attrib = gl.getAttribLocation(program, "v_pos");
 
     var previous_time = Date.now();
     var delta = 0.0;
@@ -217,7 +226,6 @@ function main()
             }
         }
 
-
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -227,12 +235,18 @@ function main()
 
         var rotated_model = mult(rotate(theta, vec3(0.0, 1.0, 0.0)), model);
         theta += 10 * delta;
-
         gl.uniformMatrix4fv(model_loc, false, flatten(rotated_model));
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
 
         gl.enableVertexAttribArray(pos_attrib);
+
+        model_arr.forEach((item) => {
+            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.pos_buf);
+            gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+
+            gl.drawArrays(gl.TRIANGLES, 0, item.model.vert_count);
+        });
 
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
