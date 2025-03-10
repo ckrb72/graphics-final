@@ -146,31 +146,35 @@ function main()
         cam_dir = vec3(0.0, 0.0, -1.0);
     });
 
-    // Holds all the models we want. 
-    // Doing it this way so we can have many objects reuse one model
-    var model_arr = [];
-    parse_model("./Table.json", gl).then((meshes) => {
+    // Holds all the models we want.
+    // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
+    // map of id -> model (array of meshes)
+    const model_map = new Map();
 
-        // Probably want to place this in a different area so we can easily change transform and stuff
+    // map of id -> scene_object that holds model/meshes and transform
+    const scene = new Map();
+    parse_model("./Table.json", gl).then((meshes) => {
+        model_map.set('Table', meshes);
         const scene_object = {
-            meshes: meshes,
-            id: 'Table',
+            meshes: model_map.get('Table'),
             transform: {
                 scale: 0.1,
-                position: vec3(0.0, 0.0, 0.0),
+                position: vec3(0.0, -0.7, 0.0),
                 rotation: {
                     angle: -90.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
-        };
-        model_arr.push(scene_object);
+        }
+
+        scene.set('Table', scene_object);
+
     });
 
     parse_model("./spotlight.json", gl).then((meshes) => {
+        model_map.set('spotlight', meshes);
         const scene_object = {
-            meshes: meshes,
-            id: 'spotlight',
+            meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
                 position: vec3(4.0, 0.0, 0.0),
@@ -180,28 +184,31 @@ function main()
                 }
             }
         }
-        model_arr.push(scene_object);
+        scene.set('spotlight', scene_object);
     });
 
     parse_model("./book.json", gl).then((meshes) => {
+        model_map.set('book', meshes);
         const scene_object = {
-            meshes: meshes,
-            id: 'book',
+            meshes: model_map.get('book'),
             transform: {
                 scale: 0.001,
-                position: vec3(-0.06, 1.1, 0.3),
+                position: vec3(-0.06, 0.0, 0.2),
                 rotation: {
                     angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
         }
-        model_arr.push(scene_object);
+        scene.set('book', scene_object);
     });
 
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
+    var lerp_time = 0.0;
+    var lerp_multiplier = 1.0;
+    var lerp_rate = 2.0;    // How long lerp should take in seconds
     var previous_time = Date.now();
     var delta = 0.0;
     var render = function()
@@ -242,6 +249,24 @@ function main()
             }
         }
 
+        var book;
+        if(book = scene.get('book'))
+        {
+            book.transform.rotation.angle += 10.0 * delta;
+            book.transform.position[1] = lerp(0.1, 0.5, lerp_time / lerp_rate);
+            lerp_time += delta * lerp_multiplier;
+            if(lerp_time >= lerp_rate)
+            {
+                lerp_time = lerp_rate;
+                lerp_multiplier = -lerp_multiplier;
+            }
+            else if(lerp_time <= 0.0)
+            {
+                lerp_time = 0.0;
+                lerp_multiplier = -lerp_multiplier;
+            }
+        }
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -256,17 +281,17 @@ function main()
         gl.enableVertexAttribArray(tex_attrib);
 
         // Render each model in the scene
-        for(model of model_arr)
+        for(const [id, object] of scene)
         {
             // Create Model Matrix
-            let model_mat = scalem(model.transform.scale, model.transform.scale, model.transform.scale);
-            model_mat = mult(rotate(model.transform.rotation.angle, model.transform.rotation.axis), model_mat);
-            model_mat = mult(translate(model.transform.position[0], model.transform.position[1], model.transform.position[2]), model_mat);
+            let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
+            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
             gl.uniformMatrix4fv(model_loc, false, flatten(model_mat));
             gl.uniformMatrix4fv(norm_matrix_loc, false, flatten(inverse4(transpose(model_mat))));
 
             // For each model, render all it's meshes
-            for(mesh of model.meshes)
+            for(mesh of object.meshes)
             {
                 // Bind Textures (assuming only ambient and normal maps)
                 gl.activeTexture(gl.TEXTURE0);
@@ -426,4 +451,9 @@ function find_uuid(arr, uuid)
     return arr.filter( (item) => {
         return item.uuid === uuid;
     })[0];
+}
+
+function lerp(a, b, time)
+{
+    return (b - a) * time + a;
 }
