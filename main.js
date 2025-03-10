@@ -146,6 +146,8 @@ function main()
         cam_dir = vec3(0.0, 0.0, -1.0);
     });
 
+    // Holds all the models we want. 
+    // Doing it this way so we can have many objects reuse one model
     var model_arr = [];
     parse_model("./Table.json", gl).then((meshes) => {
 
@@ -254,18 +256,18 @@ function main()
         gl.enableVertexAttribArray(tex_attrib);
 
         // Render each model in the scene
-        model_arr.forEach((item) => {
-
+        for(model of model_arr)
+        {
             // Create Model Matrix
-            let model_mat = scalem(item.transform.scale, item.transform.scale, item.transform.scale);
-            model_mat = mult(rotate(item.transform.rotation.angle, item.transform.rotation.axis), model_mat);
-            model_mat = mult(translate(item.transform.position[0], item.transform.position[1], item.transform.position[2]), model_mat);
+            let model_mat = scalem(model.transform.scale, model.transform.scale, model.transform.scale);
+            model_mat = mult(rotate(model.transform.rotation.angle, model.transform.rotation.axis), model_mat);
+            model_mat = mult(translate(model.transform.position[0], model.transform.position[1], model.transform.position[2]), model_mat);
             gl.uniformMatrix4fv(model_loc, false, flatten(model_mat));
             gl.uniformMatrix4fv(norm_matrix_loc, false, flatten(inverse4(transpose(model_mat))));
 
             // For each model, render all it's meshes
-            item.meshes.forEach((mesh) => {
-
+            for(mesh of model.meshes)
+            {
                 // Bind Textures (assuming only ambient and normal maps)
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
@@ -282,13 +284,15 @@ function main()
     
                 // Draw
                 gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
-            });
-        });
+            }
+        }
 
         gl.disableVertexAttribArray(pos_attrib);
         gl.disableVertexAttribArray(norm_attrib);
         gl.disableVertexAttribArray(tex_attrib);
 
+
+        // Post-processing stage
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
