@@ -18,6 +18,7 @@
         uniform mat4 projection;
         uniform mat4 view;
         uniform mat4 model;
+        uniform mat4 norm_matrix;
 
         out vec3 f_norm;
         out vec2 f_tex;
@@ -25,7 +26,7 @@
         void main()
         {
             gl_Position = projection * view * model * vec4(v_pos, 1.0);
-            f_norm = mat3(inverse(transpose(model))) * v_norm;      // Transform normals to world space
+            f_norm = mat3(norm_matrix) * v_norm;      // Transform normals to world space
             f_tex = v_tex;
         }
     </script>
