@@ -73,17 +73,21 @@ function main()
     var norm_matrix_loc = gl.getUniformLocation(program, "norm_matrix");
     var light_pos_loc = gl.getUniformLocation(program, "light_pos");
 
+    var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
+    var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
+    var shadow_view_loc = gl.getUniformLocation(shadow_program, "view");
+    var shadow_projection_loc = gl.getUniformLocation(shadow_program, "projection");
+    var shadow_pos_loc = gl.getAttribLocation(shadow_program, "v_pos");
+
     gl.useProgram(program);
     gl.uniform1i(ambient_map_loc, 0);
     gl.uniform1i(normal_map_loc, 1);
 
-    var model = mat4(1.0);
     model = scalem(0.1, 0.1, 0.1);
     var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
     var cam_pos = vec3(0.0, 0.0, 5.0);
     var cam_dir = vec3(0.0, 0.0, -1.0);
     var camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
-    var theta = 0.0;
 
     var framebuffer = gl.createFramebuffer();
     var color_attachment = gl.createTexture();
@@ -104,15 +108,19 @@ function main()
     
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
 
-
     // Create Shadow Map
+    const shadow_map_width = 2048;
+    const shadow_map_height = 2048;
     var shadow_map = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, shadow_map);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, 2048, 2048, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, shadow_map_width, shadow_map_height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+    var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
+    var shadow_view = lookAt(vec3(0.0, 2.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
 
     var shadow_framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
@@ -284,7 +292,46 @@ function main()
             }
         }
 
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
+        gl.viewport(0, 0, shadow_map_width, shadow_map_height);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.useProgram(shadow_program);
+
+        gl.uniformMatrix4fv(shadow_view_loc, false, flatten(shadow_view));
+        gl.uniformMatrix4fv(shadow_projection_loc, false, flatten(shadow_projection));
+
+        gl.enableVertexAttribArray(shadow_pos_loc);
+        // Render each model in the scene
+        for(const [id, object] of scene)
+        {
+            // Create Model Matrix
+            let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
+            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
+            gl.uniformMatrix4fv(shadow_model_loc, false, flatten(model_mat));
+    
+            // For each model, render all it's meshes
+            for(mesh of object.meshes)
+            {
+                // Bind Textures (assuming only ambient and normal maps)
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
+        
+                // Bind Buffers
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.pos_buf);
+                gl.vertexAttribPointer(shadow_pos_loc, 3, gl.FLOAT, false, 3 * 4, 0);
+        
+                // Draw
+                gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
+            }
+        }
+
+        gl.disableVertexAttribArray(shadow_pos_loc);
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.clearColor(0.3, 0.3, 0.3, 1.0);
 
