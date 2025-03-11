@@ -71,6 +71,7 @@ function main()
     var ambient_map_loc = gl.getUniformLocation(program, "ambient_map");
     var normal_map_loc = gl.getUniformLocation(program, "normal_map");
     var norm_matrix_loc = gl.getUniformLocation(program, "norm_matrix");
+    var light_pos_loc = gl.getUniformLocation(program, "light_pos");
 
     gl.useProgram(program);
     gl.uniform1i(ambient_map_loc, 0);
@@ -102,6 +103,22 @@ function main()
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depth_stencil_buffer);
     
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
+
+
+    // Create Shadow Map
+    var shadow_map = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, shadow_map);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, 2048, 2048, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+    var shadow_framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, shadow_map, 0);
+
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('shadow framebuffer status failed');
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -177,9 +194,9 @@ function main()
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
-                position: vec3(4.0, 0.0, 0.0),
+                position: vec3(0.0, 2.0, 2.0),
                 rotation: {
-                    angle: -90.0,
+                    angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
@@ -193,7 +210,7 @@ function main()
             meshes: model_map.get('book'),
             transform: {
                 scale: 0.001,
-                position: vec3(-0.06, 0.0, 0.2),
+                position: vec3(0.0, 0.0, 0.2),
                 rotation: {
                     angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
@@ -275,6 +292,12 @@ function main()
 
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
+
+        var spotlight;
+        if(spotlight = scene.get('spotlight'))
+        {
+            gl.uniform3f(light_pos_loc, spotlight.transform.position[0], spotlight.transform.position[1], spotlight.transform.position[2]);
+        }
 
         gl.enableVertexAttribArray(pos_attrib);
         gl.enableVertexAttribArray(norm_attrib);
@@ -419,7 +442,7 @@ async function parse_model(path, gl)
             });
         }
     
-        // One model can have many meshes
+        // One model can have many meshes (for right now there will only ever be 1 though)
         var meshes = [];
         meshes.push({
             vert_count: json.geometries[0].data.attributes.position.array.length / 3,
@@ -429,13 +452,6 @@ async function parse_model(path, gl)
             normal_map: normal_tex,
             ambient_map: ambient_tex
         });
-        /*model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
-        model.pos_buf = pos_buf;
-        model.norm_buf = norm_buf;
-        model.uv_buf = uv_buf;
-        model.normal_map = normal_tex;
-        model.ambient_map = ambient_tex;*/
-
 
         return meshes;
     }
