@@ -165,10 +165,13 @@ function main()
 
     var cam_type_dropdown = document.getElementById("camera-dropdown");
     var cam_type = cam_type_dropdown.value;
-    cam_type_dropdown.addEventListener('change', () => {
+    cam_type_dropdown.addEventListener('change', (event) => {
         cam_type = cam_type_dropdown.value;
         cam_pos = vec3(0.0, 0.0, 5.0);
         cam_dir = vec3(0.0, 0.0, -1.0);
+        if(cam_type_dropdown.value === 'first-person') mouse_theta = 180.0;
+        else mouse_theta = 0.0;
+        mouse_phi = 0.0;
     });
 
     // Holds all the models we want.
