@@ -1,3 +1,9 @@
+/*
+    TODO:
+    Finish Shadow Mapping (just write the shaders at this point)
+    Add specular lighting
+    Ask about Normal Mapping and how to generate binormal and tangents
+*/
 function main()
 {
     const canvas = document.getElementById('webgl-canvas');
@@ -72,16 +78,18 @@ function main()
     var normal_map_loc = gl.getUniformLocation(program, "normal_map");
     var norm_matrix_loc = gl.getUniformLocation(program, "norm_matrix");
     var light_pos_loc = gl.getUniformLocation(program, "light_pos");
+    var light_space_loc = gl.getUniformLocation(program, "light_space_mat");
+    var shadow_map_loc = gl.getUniformLocation(program, "shadow_map");
 
     var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
     var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
-    var shadow_view_loc = gl.getUniformLocation(shadow_program, "view");
-    var shadow_projection_loc = gl.getUniformLocation(shadow_program, "projection");
+    var shadow_lightspace_mat_loc = gl.getUniformLocation(shadow_program, "lightspace_mat");
     var shadow_pos_loc = gl.getAttribLocation(shadow_program, "v_pos");
 
     gl.useProgram(program);
     gl.uniform1i(ambient_map_loc, 0);
     gl.uniform1i(normal_map_loc, 1);
+    gl.uniform1i(shadow_map_loc, 2);
 
     model = scalem(0.1, 0.1, 0.1);
     var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
@@ -109,8 +117,8 @@ function main()
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
 
     // Create Shadow Map
-    const shadow_map_width = 2048;
-    const shadow_map_height = 2048;
+    const shadow_map_width = 4098;
+    const shadow_map_height = 4098;
     var shadow_map = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, shadow_map);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, shadow_map_width, shadow_map_height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
@@ -120,7 +128,9 @@ function main()
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
     var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
-    var shadow_view = lookAt(vec3(0.0, 2.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+    var shadow_view = lookAt(vec3(0.0, 1.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+
+    var lightspace_mat = mult(shadow_projection, shadow_view);
 
     var shadow_framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
@@ -194,9 +204,7 @@ function main()
                 }
             }
         }
-
         scene.set('Table', scene_object);
-
     });
 
     parse_model("./spotlight.json", gl).then((meshes) => {
@@ -230,6 +238,22 @@ function main()
         }
         scene.set('book', scene_object);
     });
+
+    parse_model("./floor.json", gl).then((meshes) => {
+        model_map.set('floor', meshes);
+        const scene_object = {
+            meshes: model_map.get('floor'),
+            transform: {
+                scale: 0.001,
+                position: vec3(0.0, 0.0, 0.0),
+                rotation: {
+                    angle: 0.0,
+                    axis: vec3(0.0, 1.0, 0.0)
+                }
+            }
+        }
+        scene.set('floor', scene_object);
+    })
 
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -300,8 +324,7 @@ function main()
         gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.useProgram(shadow_program);
 
-        gl.uniformMatrix4fv(shadow_view_loc, false, flatten(shadow_view));
-        gl.uniformMatrix4fv(shadow_projection_loc, false, flatten(shadow_projection));
+        gl.uniformMatrix4fv(shadow_lightspace_mat_loc, false, flatten(lightspace_mat));
 
         gl.enableVertexAttribArray(shadow_pos_loc);
         // Render each model in the scene
@@ -340,14 +363,20 @@ function main()
 
         gl.useProgram(program);
 
-        gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
-        gl.uniformMatrix4fv(view_loc, false, flatten(camera));
-
         var spotlight;
         if(spotlight = scene.get('spotlight'))
         {
-            gl.uniform3f(light_pos_loc, spotlight.transform.position[0], spotlight.transform.position[1], spotlight.transform.position[2]);
+            lightspace_mat = mult(shadow_projection, lookAt(vec3(0.0, 3.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
+            gl.uniform3f(light_pos_loc, 0.0, 3.0, 1.0);
         }
+
+        gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
+        gl.uniformMatrix4fv(view_loc, false, flatten(camera));
+        gl.uniformMatrix4fv(light_space_loc, false, flatten(lightspace_mat));
+
+        // Bind shadow map for sampling in fragment shader
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, shadow_map);
 
         gl.enableVertexAttribArray(pos_attrib);
         gl.enableVertexAttribArray(norm_attrib);
@@ -442,6 +471,10 @@ async function parse_model(path, gl)
 
         var geometry = find_uuid(json.geometries, current_object.geometry);
         var material = find_uuid(json.materials, current_object.material);
+
+        console.log('loading ' + path);
+        console.log(current_object);
+
 
 
         // Load buffers

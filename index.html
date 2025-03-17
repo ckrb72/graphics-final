@@ -19,10 +19,12 @@
         uniform mat4 view;
         uniform mat4 model;
         uniform mat4 norm_matrix;
+        uniform mat4 light_space_mat;
 
         out vec3 f_pos;
         out vec3 f_norm;
         out vec2 f_tex;
+        out vec4 f_pos_lightspace;
 
         void main()
         {
@@ -30,6 +32,7 @@
             f_pos = vec3(model * vec4(v_pos, 1.0));
             f_norm = mat3(norm_matrix) * v_norm;      // Transform normals to world space
             f_tex = v_tex;
+            f_pos_lightspace = light_space_mat * model * vec4(v_pos, 1.0);
         }
     </script>
 
@@ -41,13 +44,13 @@
         in vec3 f_pos;
         in vec3 f_norm;
         in vec2 f_tex;
+        in vec4 f_pos_lightspace;
 
         uniform sampler2D ambient_map;
         uniform sampler2D normal_map;
+        uniform sampler2D shadow_map;
 
         uniform vec3 light_pos;
-
-        //vec3 light_pos = vec3(1.0, 1.0, 1.0);
 
         out vec4 final_color;
         void main()
@@ -57,9 +60,12 @@
             vec3 light_dir = normalize(light_pos - f_pos);
             vec3 diffuse = ambient_tex * max(dot(norm, light_dir), 0.0);
 
-            final_color = vec4((ambient_tex * 0.2) + diffuse, 1.0);
-            
-            //final_color = texture(ambient_map, f_tex);
+            vec3 lightspace_proj = f_pos_lightspace.xyz / f_pos_lightspace.w;
+            lightspace_proj = lightspace_proj * 0.5 + 0.5;
+            float in_shadow = lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy).r ? 1.0 : 0.0;
+
+            //final_color = vec4(closest_depth, closest_depth, closest_depth, 1.0);
+            final_color = vec4((ambient_tex * 0.2) + (1.0 - in_shadow) * diffuse, 1.0);
         }
     </script>
 
@@ -67,12 +73,11 @@
         layout(location = 0) in vec3 v_pos;
 
         uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
+        uniform mat4 lightspace_mat;
 
         void main()
         {
-            gl_Position = projection * view * model * vec4(v_pos, 1.0);
+            gl_Position = lightspace_mat * model * vec4(v_pos, 1.0);
         }
     </script>
 
