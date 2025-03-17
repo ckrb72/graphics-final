@@ -58,47 +58,6 @@ function main()
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, square_indices, gl.STATIC_DRAW);
 
 
-    var vertices = new Float32Array([
-        -0.5, -0.5, 0.5,    0.0, 0.0, 1.0,
-        0.5, -0.5, 0.5,     1.0, 0.0, 0.0,
-        0.5, 0.5, 0.5,      0.0, 1.0, 0.0,
-        -0.5, 0.5, 0.5,     1.0, 1.0, 1.0,
-
-        -0.5, -0.5, -0.5,   0.0, 0.0, 0.0,
-        0.5, -0.5, -0.5,    0.0, 0.0, 1.0,
-        0.5, 0.5, -0.5,     0.0, 1.0, 0.0,
-        -0.5, 0.5, -0.5,    1.0, 0.0, 0.0
-    ]);
-
-    var vertex_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-
-    var indices = new Uint32Array([
-        0, 1, 2,
-        2, 3, 0,
-        
-        4, 5, 6,
-        6, 7, 4,
-
-        3, 2, 6,
-        6, 7, 3,
-
-        0, 1, 5,
-        5, 4, 0,
-
-        1, 5, 6,
-        6, 2, 1,
-
-        4, 0, 3,
-        3, 7, 4
-    ]);
-
-    var index_buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-
     var program = initShaders(gl, 'vertex-shader', 'fragment-shader');
 
     var pos_attrib = gl.getAttribLocation(program, "v_pos");
@@ -111,18 +70,24 @@ function main()
 
     var ambient_map_loc = gl.getUniformLocation(program, "ambient_map");
     var normal_map_loc = gl.getUniformLocation(program, "normal_map");
+    var norm_matrix_loc = gl.getUniformLocation(program, "norm_matrix");
+    var light_pos_loc = gl.getUniformLocation(program, "light_pos");
+
+    var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
+    var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
+    var shadow_view_loc = gl.getUniformLocation(shadow_program, "view");
+    var shadow_projection_loc = gl.getUniformLocation(shadow_program, "projection");
+    var shadow_pos_loc = gl.getAttribLocation(shadow_program, "v_pos");
 
     gl.useProgram(program);
     gl.uniform1i(ambient_map_loc, 0);
     gl.uniform1i(normal_map_loc, 1);
 
-    var model = mat4(1.0);
     model = scalem(0.1, 0.1, 0.1);
     var projection = perspective(45.0, canvas.width / canvas.clientHeight, 0.1, 1000.0);
     var cam_pos = vec3(0.0, 0.0, 5.0);
     var cam_dir = vec3(0.0, 0.0, -1.0);
     var camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
-    var theta = 0.0;
 
     var framebuffer = gl.createFramebuffer();
     var color_attachment = gl.createTexture();
@@ -142,6 +107,26 @@ function main()
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, depth_stencil_buffer);
     
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
+
+    // Create Shadow Map
+    const shadow_map_width = 2048;
+    const shadow_map_height = 2048;
+    var shadow_map = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, shadow_map);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, shadow_map_width, shadow_map_height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+    var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
+    var shadow_view = lookAt(vec3(0.0, 2.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+
+    var shadow_framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, shadow_map, 0);
+
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('shadow framebuffer status failed');
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -180,24 +165,78 @@ function main()
 
     var cam_type_dropdown = document.getElementById("camera-dropdown");
     var cam_type = cam_type_dropdown.value;
-    cam_type_dropdown.addEventListener('change', () => {
+    cam_type_dropdown.addEventListener('change', (event) => {
         cam_type = cam_type_dropdown.value;
         cam_pos = vec3(0.0, 0.0, 5.0);
+        cam_dir = vec3(0.0, 0.0, -1.0);
+        if(cam_type_dropdown.value === 'first-person') mouse_theta = 180.0;
+        else mouse_theta = 0.0;
+        mouse_phi = 0.0;
     });
 
-    var model_arr = [];
-    parse_model("./Table.json", gl).then(model => {
+    // Holds all the models we want.
+    // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
+    // map of id -> model (array of meshes)
+    const model_map = new Map();
+
+    // map of id -> scene_object that holds model/meshes and transform
+    const scene = new Map();
+    parse_model("./Table.json", gl).then((meshes) => {
+        model_map.set('Table', meshes);
         const scene_object = {
-            model: model,
+            meshes: model_map.get('Table'),
             transform: {
-                scale: 1.0,
-                position: vec3(0.0, 0.0, 0.0),
-                rotation: vec4(1.0, 0.0, 0.0, 0.0)
+                scale: 0.1,
+                position: vec3(0.0, -0.7, 0.0),
+                rotation: {
+                    angle: -90.0,
+                    axis: vec3(0.0, 1.0, 0.0)
+                }
             }
-        };
-        model_arr.push(scene_object);
+        }
+
+        scene.set('Table', scene_object);
+
     });
 
+    parse_model("./spotlight.json", gl).then((meshes) => {
+        model_map.set('spotlight', meshes);
+        const scene_object = {
+            meshes: model_map.get('spotlight'),
+            transform: {
+                scale: 0.01,
+                position: vec3(0.0, 2.0, 2.0),
+                rotation: {
+                    angle: 0.0,
+                    axis: vec3(0.0, 1.0, 0.0)
+                }
+            }
+        }
+        scene.set('spotlight', scene_object);
+    });
+
+    parse_model("./book.json", gl).then((meshes) => {
+        model_map.set('book', meshes);
+        const scene_object = {
+            meshes: model_map.get('book'),
+            transform: {
+                scale: 0.001,
+                position: vec3(0.0, 0.0, 0.2),
+                rotation: {
+                    angle: 0.0,
+                    axis: vec3(0.0, 1.0, 0.0)
+                }
+            }
+        }
+        scene.set('book', scene_object);
+    });
+
+    // Have to do this since the image data is flipped when loading from the json
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    var lerp_time = 0.0;
+    var lerp_multiplier = 1.0;
+    var lerp_rate = 2.0;    // How long lerp should take in seconds
     var previous_time = Date.now();
     var delta = 0.0;
     var render = function()
@@ -225,65 +264,133 @@ function main()
                     if(input_map.get('d') == 1) cam_pos = add(cam_pos, scale(delta, normalize(cross(cam_dir, vec3(0.0, 1.0, 0.0)))));
                     camera = lookAt(cam_pos, add(cam_pos, cam_dir), vec3(0.0, 1.0, 0.0));
                     break;
+
                 case 'orbit':
                     cam_pos[0] = cam_radius * Math.sin(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
                     cam_pos[1] = cam_radius * Math.sin(radians(mouse_phi));
                     cam_pos[2] = cam_radius * Math.cos(radians(-mouse_theta)) * Math.cos(radians(mouse_phi));
                     camera = lookAt(cam_pos, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
                     break;
+
                 default:
                     break;
             }
         }
 
+        var book;
+        if(book = scene.get('book'))
+        {
+            book.transform.rotation.angle += 10.0 * delta;
+            book.transform.position[1] = lerp(0.1, 0.5, lerp_time / lerp_rate);
+            lerp_time += delta * lerp_multiplier;
+            if(lerp_time >= lerp_rate)
+            {
+                lerp_time = lerp_rate;
+                lerp_multiplier = -lerp_multiplier;
+            }
+            else if(lerp_time <= 0.0)
+            {
+                lerp_time = 0.0;
+                lerp_multiplier = -lerp_multiplier;
+            }
+        }
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
+        gl.viewport(0, 0, shadow_map_width, shadow_map_height);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.useProgram(shadow_program);
+
+        gl.uniformMatrix4fv(shadow_view_loc, false, flatten(shadow_view));
+        gl.uniformMatrix4fv(shadow_projection_loc, false, flatten(shadow_projection));
+
+        gl.enableVertexAttribArray(shadow_pos_loc);
+        // Render each model in the scene
+        for(const [id, object] of scene)
+        {
+            // Create Model Matrix
+            let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
+            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
+            gl.uniformMatrix4fv(shadow_model_loc, false, flatten(model_mat));
+    
+            // For each model, render all it's meshes
+            for(mesh of object.meshes)
+            {
+                // Bind Textures (assuming only ambient and normal maps)
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
+        
+                // Bind Buffers
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.pos_buf);
+                gl.vertexAttribPointer(shadow_pos_loc, 3, gl.FLOAT, false, 3 * 4, 0);
+        
+                // Draw
+                gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
+            }
+        }
+
+        gl.disableVertexAttribArray(shadow_pos_loc);
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.clearColor(0.3, 0.3, 0.3, 1.0);
 
         gl.useProgram(program);
 
-
-        var rotated_model = mult(rotate(theta, vec3(0.0, 1.0, 0.0)), model);
-        theta = -90.0;
-        gl.uniformMatrix4fv(model_loc, false, flatten(rotated_model));
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
+
+        var spotlight;
+        if(spotlight = scene.get('spotlight'))
+        {
+            gl.uniform3f(light_pos_loc, spotlight.transform.position[0], spotlight.transform.position[1], spotlight.transform.position[2]);
+        }
 
         gl.enableVertexAttribArray(pos_attrib);
         gl.enableVertexAttribArray(norm_attrib);
         gl.enableVertexAttribArray(tex_attrib);
 
-        model_arr.forEach((item) => {
+        // Render each model in the scene
+        for(const [id, object] of scene)
+        {
+            // Create Model Matrix
+            let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
+            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
+            gl.uniformMatrix4fv(model_loc, false, flatten(model_mat));
+            gl.uniformMatrix4fv(norm_matrix_loc, false, flatten(inverse4(transpose(model_mat))));
 
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, item.model.ambient_map);
-
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, item.model.normal_map);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.pos_buf);
-            gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.norm_buf);
-            gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, item.model.uv_buf);
-            gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
-
-            gl.drawArrays(gl.TRIANGLES, 0, item.model.vert_count);
-        });
-
-        /*gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, index_buffer);
-
-        gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 6 * 4, 0);
-        //gl.vertexAttribPointer(color_attrib, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
-        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);*/
+            // For each model, render all it's meshes
+            for(mesh of object.meshes)
+            {
+                // Bind Textures (assuming only ambient and normal maps)
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
+    
+                // Bind Buffers
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.pos_buf);
+                gl.vertexAttribPointer(pos_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.norm_buf);
+                gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.uv_buf);
+                gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
+    
+                // Draw
+                gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
+            }
+        }
 
         gl.disableVertexAttribArray(pos_attrib);
         gl.disableVertexAttribArray(norm_attrib);
         gl.disableVertexAttribArray(tex_attrib);
 
+
+        // Post-processing stage
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -330,20 +437,25 @@ async function parse_model(path, gl)
         }
 
         const json = await response.json();
-        var model = {};
+
+        var current_object = json.object;
+
+        var geometry = find_uuid(json.geometries, current_object.geometry);
+        var material = find_uuid(json.materials, current_object.material);
+
 
         // Load buffers
         var pos_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, pos_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.position.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.position.array), gl.STATIC_DRAW);
     
         var norm_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, norm_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.normal.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.normal.array), gl.STATIC_DRAW);
     
         var uv_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(json.geometries[0].data.attributes.uv.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.uv.array), gl.STATIC_DRAW);
     
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
@@ -354,8 +466,8 @@ async function parse_model(path, gl)
         var normal_tex = gl.createTexture();
         {
             // Get the corresponding textures for each map in the material
-            var ambient_image_id = find_uuid(json.textures, json.materials[0].map).image;
-            var normal_image_id = find_uuid(json.textures, json.materials[0].normalMap).image;
+            var ambient_image_id = find_uuid(json.textures, material.map).image;
+            var normal_image_id = find_uuid(json.textures, material.normalMap).image;
 
             // Get the corresponding images for each textures
             var ambient_image_url = find_uuid(json.images, ambient_image_id).url;
@@ -380,15 +492,18 @@ async function parse_model(path, gl)
             });
         }
     
-        model.vert_count = json.geometries[0].data.attributes.position.array.length / 3;
-        model.pos_buf = pos_buf;
-        model.norm_buf = norm_buf;
-        model.uv_buf = uv_buf;
-        model.normal_map = normal_tex;
-        model.ambient_map = ambient_tex;
+        // One model can have many meshes (for right now there will only ever be 1 though)
+        var meshes = [];
+        meshes.push({
+            vert_count: json.geometries[0].data.attributes.position.array.length / 3,
+            pos_buf: pos_buf,
+            norm_buf: norm_buf,
+            uv_buf: uv_buf,
+            normal_map: normal_tex,
+            ambient_map: ambient_tex
+        });
 
-
-        return model;
+        return meshes;
     }
     catch (error)
     {
@@ -402,4 +517,9 @@ function find_uuid(arr, uuid)
     return arr.filter( (item) => {
         return item.uuid === uuid;
     })[0];
+}
+
+function lerp(a, b, time)
+{
+    return (b - a) * time + a;
 }
