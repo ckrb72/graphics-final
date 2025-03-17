@@ -244,11 +244,11 @@ function main()
         const scene_object = {
             meshes: model_map.get('floor'),
             transform: {
-                scale: 0.001,
-                position: vec3(0.0, 0.0, 0.0),
+                scale: 0.01,
+                position: vec3(0.9, -0.7, 0.0),
                 rotation: {
-                    angle: 0.0,
-                    axis: vec3(0.0, 1.0, 0.0)
+                    angle: -90.0,
+                    axis: vec3(1.0, 0.0, 0.0)
                 }
             }
         }
