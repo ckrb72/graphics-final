@@ -1,8 +1,11 @@
 /*
     TODO:
-    Finish Shadow Mapping (just write the shaders at this point)
+    Finish post-processing (blur and edge detection)
     Add specular lighting
     Ask about Normal Mapping and how to generate binormal and tangents
+    Ask about making shadows less pixelated
+    Set up light model so it points in direction of light
+    Set up HTML so you can move light
 */
 function main()
 {
@@ -245,7 +248,7 @@ function main()
             meshes: model_map.get('floor'),
             transform: {
                 scale: 0.01,
-                position: vec3(0.9, -0.7, 0.0),
+                position: vec3(0.95, -0.7, 0.0),
                 rotation: {
                     angle: -90.0,
                     axis: vec3(1.0, 0.0, 0.0)

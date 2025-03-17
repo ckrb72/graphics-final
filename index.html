@@ -32,7 +32,7 @@
             f_pos = vec3(model * vec4(v_pos, 1.0));
             f_norm = mat3(norm_matrix) * v_norm;      // Transform normals to world space
             f_tex = v_tex;
-            f_pos_lightspace = light_space_mat * model * vec4(v_pos, 1.0);
+            f_pos_lightspace = light_space_mat * vec4(f_pos, 1.0);
         }
     </script>
 
@@ -64,7 +64,6 @@
             lightspace_proj = lightspace_proj * 0.5 + 0.5;
             float in_shadow = lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy).r ? 1.0 : 0.0;
 
-            //final_color = vec4(closest_depth, closest_depth, closest_depth, 1.0);
             final_color = vec4((ambient_tex * 0.2) + (1.0 - in_shadow) * diffuse, 1.0);
         }
     </script>
