@@ -187,6 +187,10 @@ function main()
         mouse_phi = 0.0;
     });
 
+
+    // Scene graph menu element
+    var scene_graph_menu = document.getElementById('scene-graph');
+
     // Holds all the models we want.
     // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
     // map of id -> model (array of meshes)
@@ -208,6 +212,11 @@ function main()
             }
         }
         scene.set('Table', scene_object);
+
+        let new_option = document.createElement('option');
+        new_option.value = 'table';
+        new_option.text = 'table';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./spotlight.json", gl).then((meshes) => {
@@ -224,6 +233,10 @@ function main()
             }
         }
         scene.set('spotlight', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'spotlight';
+        new_option.text = 'spotlight';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./book.json", gl).then((meshes) => {
@@ -240,6 +253,10 @@ function main()
             }
         }
         scene.set('book', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'book';
+        new_option.text = 'book';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./floor.json", gl).then((meshes) => {
@@ -256,6 +273,16 @@ function main()
             }
         }
         scene.set('floor', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'floor';
+        new_option.text = 'floor';
+        scene_graph_menu.appendChild(new_option);
+    })
+
+    scene_graph_menu.addEventListener('click', () => {
+        console.log(scene_graph_menu.value);
+
+        // Update properties div
     })
 
     // Have to do this since the image data is flipped when loading from the json
@@ -474,11 +501,6 @@ async function parse_model(path, gl)
 
         var geometry = find_uuid(json.geometries, current_object.geometry);
         var material = find_uuid(json.materials, current_object.material);
-
-        console.log('loading ' + path);
-        console.log(current_object);
-
-
 
         // Load buffers
         var pos_buf = gl.createBuffer();

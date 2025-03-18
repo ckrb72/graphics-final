@@ -9,18 +9,57 @@ body {
     margin-right: auto;
 }
 
-#text-content {
-    display: flex;
+select {
+    overflow-y: auto;
 }
 
 #instructions {
     text-align: center;
-    width: 50%;
+    width: 75%;
+    outline: 1px solid rgb(0 0 0);
+    margin: auto;
+    margin-top: 2%;
 }
 
-#settings {
+#selectable-options {
+    width: 75%;
+    margin: auto;
     display: flex;
+}
+
+
+#settings {
+    display:flexbox;
+    width: 35%;
+    outline: 1px solid rgb(0 0 0);
+}
+
+#scene {
+    width: 65%;
+    outline: 1px solid rgb(0 0 0);
+    display: flex;
+}
+
+.scene-submenu {
     width: 50%;
+    outline: 1px solid rgb(0 0 0);
+    margin: 0;
+    text-align: center;
+}
+
+.scene-submenu > h4 {
+    margin: 3% 0 3% 0;
+}
+
+#scene-graph {
+    width: 100%;
+    text-align: center;
+}
+
+.settings-option {
+    text-align: center;
+    padding-top: 2%;
+    padding-bottom: 2%;
 }
 
 #post-process-dropdown {

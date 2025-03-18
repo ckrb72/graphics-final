@@ -150,7 +150,7 @@
 
     <div id="text-content">
         <div id="instructions">
-            <p>Controls (Must be in locked mode to move):</p>
+            Controls (Must be in locked mode to move): <br>
             Click the Canvas to lock mouse <br>
             Move mouse around in locked mode to move camera<br>
             ESC - leave locked mouse mode<br>
@@ -158,32 +158,46 @@
             A / D - left / right<br>
             Space / Left Shift - up / down <br>
         </div>
-        <div id="settings">
-            <div id="post-processing">
-                <p>Post-Processing:</p>
-                <select id="post-process-dropdown">
-                    <option value="none">None</option>
-                    <option value="grayscale">Grayscale</option>
-                    <option value="invert">Invert Colors</option>
-                    <option value="blur">Blur</option>
-                    <option value="edge-detection">Edge Detection</option>
-                </select>
-            </div>
-            <div>
-                <p>Camera:</p>
-                <label for="camera-dropdown">Type:</label>
-                <select id="camera-dropdown">
-                    <option value="first-person">First Person</option>
-                    <option value="orbit">Orbit</option>
-                </select>
-            </div>
 
-            <div id="light-settings">
-                <p>Light:</p>
-                <label for="color-picker">Light Color:</label>
-                <input id="color-picker" type="color" name="color-picker" value="#ffffff" />
-                <p>Light Pos:</p>
+        <div id="selectable-options">
+            <div id="settings">
+                <div id="post-processing" class="settings-option">
+                    <label for="post-process-dropdown">Post-Processing:</label>
+                    <select id="post-process-dropdown">
+                        <option value="none">None</option>
+                        <option value="grayscale">Grayscale</option>
+                        <option value="invert">Invert Colors</option>
+                        <option value="blur">Blur</option>
+                        <option value="edge-detection">Edge Detection</option>
+                    </select>
+                </div>
+    
+                <div class="settings-option">
+                    <label for="camera-dropdown">Camera:</label>
+                    <select id="camera-dropdown">
+                        <option value="first-person">First Person</option>
+                        <option value="orbit">Orbit</option>
+                    </select>
+                </div>
             </div>
+            <div id="scene">
+                <div class="scene-submenu">
+                    <h4>Scene</h4>
+                    <select id="scene-graph" size="10">
+                        <option>Add Object</option>
+                    </select>
+                </div>
+                <div class="scene-submenu">
+                    <h4>Properties</h4>
+                </div>
+            </div>
+        </div>
+
+        <div id="light-settings">
+            <p>Light:</p>
+            <label for="color-picker">Light Color:</label>
+            <input id="color-picker" type="color" name="color-picker" value="#ffffff" />
+            <p>Light Pos:</p>
         </div>
     </div>
 </body>
