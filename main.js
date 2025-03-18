@@ -7,12 +7,22 @@
     Set up light model so it points in direction of light
     Set up HTML so you can move light
 */
+
+
+// Holds all the models we want.
+// Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
+// map of id -> model (array of meshes)
+const model_map = new Map();
+
+// map of id -> scene_object that holds model/meshes and transform
+const scene = new Map();
+
 function main()
 {
     const canvas = document.getElementById('webgl-canvas');
 
     const aspect_ratio = 16.0 / 9.0;
-    canvas.width = window.innerWidth / 1.5;
+    canvas.width = window.innerWidth * 0.75;
     canvas.height = canvas.width * (1 / aspect_ratio);
 
     canvas.addEventListener("click", () => {
@@ -191,13 +201,6 @@ function main()
     // Scene graph menu element
     var scene_graph_menu = document.getElementById('scene-graph');
 
-    // Holds all the models we want.
-    // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
-    // map of id -> model (array of meshes)
-    const model_map = new Map();
-
-    // map of id -> scene_object that holds model/meshes and transform
-    const scene = new Map();
     parse_model("./Table.json", gl).then((meshes) => {
         model_map.set('Table', meshes);
         const scene_object = {
@@ -617,11 +620,27 @@ function generate_properties(scene_object)
                 name_input.placeholder = 'Name';
                 property_element.appendChild(name_input);
 
+                const model_label = document.createElement('label');
+                model_label.for = 'model-dropdown';
+                model_label.innerText = 'Model: ';
+                property_element.appendChild(model_label);
+
+                const model_dropdown = document.createElement('select');
+                model_dropdown.id = 'model-dropdown';
+                for (const [key] of model_map) {
+                    const option_element = document.createElement('option');
+                    option_element.value = key;
+                    option_element.text = key;
+                    model_dropdown.appendChild(option_element);
+                }
+                property_element.appendChild(model_dropdown);
+
                 const create_button = document.createElement('button');
                 create_button.id = 'create_button';
                 create_button.innerText = 'Add';
                 create_button.onclick = () => {console.log('hello world')}
                 property_element.appendChild(create_button);
+
             }
             break;
 
