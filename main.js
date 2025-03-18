@@ -201,6 +201,8 @@ function main()
     parse_model("./Table.json", gl).then((meshes) => {
         model_map.set('Table', meshes);
         const scene_object = {
+            name: 'Table',
+            type: 'object',
             meshes: model_map.get('Table'),
             transform: {
                 scale: 0.1,
@@ -214,14 +216,16 @@ function main()
         scene.set('Table', scene_object);
 
         let new_option = document.createElement('option');
-        new_option.value = 'table';
-        new_option.text = 'table';
+        new_option.value = 'Table';
+        new_option.text = 'Table';
         scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./spotlight.json", gl).then((meshes) => {
         model_map.set('spotlight', meshes);
         const scene_object = {
+            name: 'spotlight',
+            type: 'light',
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
@@ -242,6 +246,8 @@ function main()
     parse_model("./book.json", gl).then((meshes) => {
         model_map.set('book', meshes);
         const scene_object = {
+            name: 'book',
+            type: 'object',
             meshes: model_map.get('book'),
             transform: {
                 scale: 0.001,
@@ -262,6 +268,8 @@ function main()
     parse_model("./floor.json", gl).then((meshes) => {
         model_map.set('floor', meshes);
         const scene_object = {
+            name: 'floor',
+            type: 'object',
             meshes: model_map.get('floor'),
             transform: {
                 scale: 0.01,
@@ -279,10 +287,22 @@ function main()
         scene_graph_menu.appendChild(new_option);
     })
 
+    var properties_menu = document.getElementById('properties-menu');
+
     scene_graph_menu.addEventListener('click', () => {
-        console.log(scene_graph_menu.value);
+        // Remove old properties div
+        const old_props = document.getElementById('properties');
+        if(old_props) old_props.remove();
 
         // Update properties div
+        if(scene_graph_menu.value === '') return;
+
+        // Wrap the add option in an object to make it easier for generate_properties to work with it
+        let scene_object = {};
+        if (scene_graph_menu.value === '+') scene_object = {type: '+'}
+        else scene_object = scene.get(scene_graph_menu.value);
+
+        properties_menu.appendChild(generate_properties(scene_object));
     })
 
     // Have to do this since the image data is flipped when loading from the json
@@ -580,4 +600,63 @@ function find_uuid(arr, uuid)
 function lerp(a, b, time)
 {
     return (b - a) * time + a;
+}
+
+function generate_properties(scene_object)
+{
+    let property_element = document.createElement('div');
+    property_element.id = 'properties';
+
+    switch(scene_object.type)
+    {
+        case '+':
+            {
+                const name_input = document.createElement('input');
+                name_input.type = 'text';
+                name_input.id = 'name_input';
+                name_input.placeholder = 'Name';
+                property_element.appendChild(name_input);
+
+                const create_button = document.createElement('button');
+                create_button.id = 'create_button';
+                create_button.innerText = 'Add';
+                create_button.onclick = () => {console.log('hello world')}
+                property_element.appendChild(create_button);
+            }
+            break;
+
+        case 'object':
+            {
+                const name = document.createElement('p');
+                name.id = 'item-name';
+                name.innerText = scene_object.name + ':';
+                property_element.appendChild(name);
+            }
+            break;
+
+        case 'light':
+            {
+                const name = document.createElement('p');
+                name.id = 'item-name';
+                name.innerText = scene_object.name + ':';
+                property_element.appendChild(name);
+
+                const color_picker = document.createElement('input');
+                color_picker.type = 'color';
+                color_picker.id = 'color-picker';
+                color_picker.value = '#ffffff';
+
+                const color_picker_label = document.createElement('label');
+                color_picker_label.for = 'color-picker';
+                color_picker_label.innerText = 'Color: ';
+                property_element.appendChild(color_picker_label);
+                property_element.appendChild(color_picker);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    return property_element;
 }
