@@ -204,6 +204,11 @@ function main()
     parse_model("./Table.json", gl).then((meshes) => {
         model_map.set('Table', meshes);
         const scene_object = {
+            lerp: {
+                enabled: false,
+                start: vec3(0.0, 0.0, 0.0),
+                end: vec3(0.0, 0.0, 0.0)
+            },
             name: 'Table',
             type: 'object',
             meshes: model_map.get('Table'),
@@ -249,6 +254,11 @@ function main()
     parse_model("./book.json", gl).then((meshes) => {
         model_map.set('book', meshes);
         const scene_object = {
+            lerp: {
+                enabled: true,
+                start: vec3(0.0, 0.0, 0.0),
+                end: vec3(0.0, 0.0, 0.0)
+            },
             name: 'book',
             type: 'object',
             meshes: model_map.get('book'),
@@ -271,6 +281,11 @@ function main()
     parse_model("./floor.json", gl).then((meshes) => {
         model_map.set('floor', meshes);
         const scene_object = {
+            lerp: {
+                enabled: false,
+                start: vec3(0.0, 0.0, 0.0),
+                end: vec3(0.0, 0.0, 0.0)
+            },
             name: 'floor',
             type: 'object',
             meshes: model_map.get('floor'),
@@ -305,7 +320,7 @@ function main()
         if (scene_graph_menu.value === '+') scene_object = {type: '+'}
         else scene_object = scene.get(scene_graph_menu.value);
 
-        properties_menu.appendChild(generate_properties(scene_object));
+        properties_menu.appendChild(generate_properties(scene_object, scene_graph_menu));
     })
 
     // Have to do this since the image data is flipped when loading from the json
@@ -605,13 +620,20 @@ function lerp(a, b, time)
     return (b - a) * time + a;
 }
 
-function generate_properties(scene_object)
+function generate_properties(scene_object, scene_list)
 {
     let property_element = document.createElement('div');
     property_element.id = 'properties';
 
     switch(scene_object.type)
     {
+        case 'empty':
+            {
+                const empty_text = document.createElement('p');
+                empty_text.innerText = 'No Object Selected';
+                property_element.appendChild(empty_text);
+            }
+            break;
         case '+':
             {
                 const name_input = document.createElement('input');
@@ -638,7 +660,41 @@ function generate_properties(scene_object)
                 const create_button = document.createElement('button');
                 create_button.id = 'create_button';
                 create_button.innerText = 'Add';
-                create_button.onclick = () => {console.log('hello world')}
+                create_button.onclick = () => {
+                    let name = name_input.value;
+
+                    // generate random name if empty string is input or the name already exists
+                    if(name === '' || scene.get(name) != null) {
+                        name = 'random';
+                    }
+                    
+                    const new_object = {
+                        lerp: {
+                            enabled: false,
+                            start: vec3(0.0, 0.0, 0.0),
+                            end: vec3(0.0, 0.0, 0.0)
+                        },
+                        name: name,
+                        type: 'object',
+                        meshes: model_map.get(model_dropdown.value),
+
+                        // TODO: set transform up
+                        transform: {
+                            scale: 0.01,
+                            position: vec3(0.95, -0.7, 0.0),
+                            rotation: {
+                                angle: -90.0,
+                                axis: vec3(1.0, 0.0, 0.0)
+                            }
+                        }
+                    };
+
+                    scene.set(name, new_object);
+                    const new_option = document.createElement('option');
+                    new_option.text = name;
+                    new_option.value = name;
+                    scene_list.append(new_option);
+                };
                 property_element.appendChild(create_button);
 
             }
@@ -650,6 +706,48 @@ function generate_properties(scene_object)
                 name.id = 'item-name';
                 name.innerText = scene_object.name + ':';
                 property_element.appendChild(name);
+
+                /*const checkbox = document.createElement('input');
+                checkbox.id = 'object-checkbox';
+                checkbox.type = 'checkbox';
+                checkbox.checked = scene_object.lerp.enabled;
+                checkbox.onclick = () => {scene_object.lerp.enabled = checkbox.checked;};
+                const checkbox_label = document.createElement('label');
+                checkbox_label.for = 'object-checkbox';
+                checkbox_label.innerText = 'Lerp:';
+                property_element.appendChild(checkbox_label);
+                property_element.appendChild(checkbox);*/
+
+                /*if(scene_object.lerp.enabled)
+                {
+                    const start_input = document.createElement('input');
+                    start_input.type = 'number';
+                    start_input.value = '1.0';
+                    const end_input = document.createElement('input');
+                    end_input.type = 'number';
+                    end_input.value = '1.0';
+
+                    property_element.appendChild(start_input);
+                    property_element.appendChild(end_input);
+                }*/
+
+                const remove_button = document.createElement('button');
+                remove_button.innerText = 'remove';
+                remove_button.onclick = () => {
+                    // Delete object from scene
+                    scene.delete(scene_object.name);
+
+                    // Delete object from scene graph menu
+                    const object_option_element = Array.from(scene_list.options).filter((object) => {return object.value === scene_object.name})[0];
+                    object_option_element.remove();
+
+                    // Remove Property Options from Properties Menu
+                    const property_div = document.getElementById('properties');
+                    if(property_div) property_div.remove();
+                    var properties_menu = document.getElementById('properties-menu');
+                    properties_menu.appendChild(generate_properties({type: 'empty'}, null));
+                };
+                property_element.appendChild(remove_button);
             }
             break;
 
