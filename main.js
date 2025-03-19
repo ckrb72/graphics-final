@@ -5,14 +5,23 @@
     Ask about Normal Mapping and how to generate binormal and tangents
     Ask about making shadows less pixelated
     Set up light model so it points in direction of light
-    Set up HTML so you can move light
 */
+
+
+// Holds all the models we want.
+// Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
+// map of id -> model (array of meshes)
+const model_map = new Map();
+
+// map of id -> scene_object that holds model/meshes and transform
+const scene = new Map();
+
 function main()
 {
     const canvas = document.getElementById('webgl-canvas');
 
     const aspect_ratio = 16.0 / 9.0;
-    canvas.width = window.innerWidth / 1.5;
+    canvas.width = window.innerWidth * 0.75;
     canvas.height = canvas.width * (1 / aspect_ratio);
 
     canvas.addEventListener("click", () => {
@@ -187,83 +196,148 @@ function main()
         mouse_phi = 0.0;
     });
 
-    // Holds all the models we want.
-    // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
-    // map of id -> model (array of meshes)
-    const model_map = new Map();
 
-    // map of id -> scene_object that holds model/meshes and transform
-    const scene = new Map();
+    // Scene graph menu element
+    var scene_graph_menu = document.getElementById('scene-graph');
+
     parse_model("./Table.json", gl).then((meshes) => {
         model_map.set('Table', meshes);
         const scene_object = {
+            lerp: {
+                enabled: false,
+                start_abs: vec3(0.0, 0.0, 0.0),
+                end_abs: vec3(0.0, 1.0, 0.0),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
+            },
+            name: 'Table',
+            type: 'object',
             meshes: model_map.get('Table'),
             transform: {
                 scale: 0.1,
                 position: vec3(0.0, -0.7, 0.0),
                 rotation: {
+                    enabled: false,
                     angle: -90.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
         }
         scene.set('Table', scene_object);
+
+        let new_option = document.createElement('option');
+        new_option.value = 'Table';
+        new_option.text = 'Table';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./spotlight.json", gl).then((meshes) => {
         model_map.set('spotlight', meshes);
         const scene_object = {
+            name: 'spotlight',
+            type: 'light',
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
-                position: vec3(0.0, 2.0, 2.0),
+                position: vec3(0.0, 2.0, 1.0),
                 rotation: {
-                    angle: 0.0,
+                    enabled: false,
+                    angle: 90.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
         }
         scene.set('spotlight', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'spotlight';
+        new_option.text = 'spotlight';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./book.json", gl).then((meshes) => {
         model_map.set('book', meshes);
         const scene_object = {
+            lerp: {
+                enabled: true,
+                start_abs: vec3(0.0, 0.15, 0.2),
+                end_abs: vec3(0.0, 0.6, 0.2),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
+            },
+            name: 'book',
+            type: 'object',
             meshes: model_map.get('book'),
             transform: {
                 scale: 0.001,
                 position: vec3(0.0, 0.0, 0.2),
                 rotation: {
+                    enabled: true,
                     angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
         }
         scene.set('book', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'book';
+        new_option.text = 'book';
+        scene_graph_menu.appendChild(new_option);
     });
 
     parse_model("./floor.json", gl).then((meshes) => {
         model_map.set('floor', meshes);
         const scene_object = {
+            lerp: {
+                enabled: false,
+                start_abs: vec3(0.0, 0.0, 0.0),
+                end_abs: vec3(0.0, 1.0, 0.0),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
+            },
+            name: 'floor',
+            type: 'object',
             meshes: model_map.get('floor'),
             transform: {
                 scale: 0.01,
                 position: vec3(0.95, -0.7, 0.0),
                 rotation: {
+                    enabled: false,
                     angle: -90.0,
                     axis: vec3(1.0, 0.0, 0.0)
                 }
             }
         }
         scene.set('floor', scene_object);
+        let new_option = document.createElement('option');
+        new_option.value = 'floor';
+        new_option.text = 'floor';
+        scene_graph_menu.appendChild(new_option);
+    })
+
+    var properties_menu = document.getElementById('properties-menu');
+
+    scene_graph_menu.addEventListener('click', () => {
+        // Remove old properties div
+        const old_props = document.getElementById('properties');
+        if(old_props) old_props.remove();
+
+        // Update properties div
+        if(scene_graph_menu.value === '') return;
+
+        // Wrap the add option in an object to make it easier for generate_properties to work with it
+        let scene_object = {};
+        if (scene_graph_menu.value === '+') scene_object = {type: '+'}
+        else scene_object = scene.get(scene_graph_menu.value);
+
+        properties_menu.appendChild(generate_properties(scene_object, scene_graph_menu));
     })
 
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    var lerp_time = 0.0;
-    var lerp_multiplier = 1.0;
-    var lerp_rate = 2.0;    // How long lerp should take in seconds
     var previous_time = Date.now();
     var delta = 0.0;
     var render = function()
@@ -304,24 +378,19 @@ function main()
             }
         }
 
-        var book;
-        if(book = scene.get('book'))
+        // Update all objects
+        for (const [key, object] of scene)
         {
-            book.transform.rotation.angle += 10.0 * delta;
-            book.transform.position[1] = lerp(0.1, 0.5, lerp_time / lerp_rate);
-            lerp_time += delta * lerp_multiplier;
-            if(lerp_time >= lerp_rate)
-            {
-                lerp_time = lerp_rate;
-                lerp_multiplier = -lerp_multiplier;
-            }
-            else if(lerp_time <= 0.0)
-            {
-                lerp_time = 0.0;
-                lerp_multiplier = -lerp_multiplier;
-            }
+            if(object.type !== 'object') continue;
+
+            // Rotate
+            if(object.transform.rotation.enabled) object.transform.rotation.angle += 20.0 * delta;
+
+            // Lerp
+            if(object.lerp.enabled) lerp(object, delta);
         }
 
+        // Render Shadow Map
         gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
         gl.viewport(0, 0, shadow_map_width, shadow_map_height);
         gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -359,6 +428,7 @@ function main()
 
         gl.disableVertexAttribArray(shadow_pos_loc);
 
+        // Render Scene
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -369,8 +439,8 @@ function main()
         var spotlight;
         if(spotlight = scene.get('spotlight'))
         {
-            lightspace_mat = mult(shadow_projection, lookAt(vec3(0.0, 3.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
-            gl.uniform3f(light_pos_loc, 0.0, 3.0, 1.0);
+            lightspace_mat = mult(shadow_projection, lookAt(spotlight.transform.position, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
+            gl.uniform3fv(light_pos_loc, flatten(spotlight.transform.position));
         }
 
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
@@ -422,7 +492,7 @@ function main()
         gl.disableVertexAttribArray(tex_attrib);
 
 
-        // Post-processing stage
+        // Post-Processing
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -474,11 +544,6 @@ async function parse_model(path, gl)
 
         var geometry = find_uuid(json.geometries, current_object.geometry);
         var material = find_uuid(json.materials, current_object.material);
-
-        console.log('loading ' + path);
-        console.log(current_object);
-
-
 
         // Load buffers
         var pos_buf = gl.createBuffer();
@@ -555,7 +620,310 @@ function find_uuid(arr, uuid)
     })[0];
 }
 
-function lerp(a, b, time)
+function lerp_vec3(a, b, time)
 {
-    return (b - a) * time + a;
+    // fancy way of doing lerp = (b - a) * time + a;
+    return add(a, scale(time, subtract(b, a)));
+}
+
+function lerp(scene_object, delta)
+{
+    scene_object.transform.position = lerp_vec3(scene_object.lerp.start_abs, scene_object.lerp.end_abs, scene_object.lerp.time / scene_object.lerp.rate);
+    scene_object.lerp.time += delta * scene_object.lerp.multiplier;
+    if(scene_object.lerp.time >= scene_object.lerp.rate)
+    {
+        scene_object.lerp.time = scene_object.lerp.rate;
+        scene_object.lerp.multiplier = -scene_object.lerp.multiplier;
+    }
+    else if(scene_object.lerp.time <= 0.0)
+    {
+        scene_object.lerp.time = 0.0;
+        scene_object.lerp.multiplier = -scene_object.lerp.multiplier;
+    }
+}
+
+function generate_properties(scene_object, scene_list)
+{
+    let property_element = document.createElement('div');
+    property_element.id = 'properties';
+
+    switch(scene_object.type)
+    {
+        case 'empty':
+            {
+                const empty_text = document.createElement('p');
+                empty_text.innerText = 'No Object Selected';
+                property_element.appendChild(empty_text);
+            }
+            break;
+        case '+':
+            {
+                const name_input = document.createElement('input');
+                name_input.type = 'text';
+                name_input.id = 'name_input';
+                name_input.placeholder = 'Name';
+                property_element.appendChild(name_input);
+
+                const model_label = document.createElement('label');
+                model_label.for = 'model-dropdown';
+                model_label.innerText = 'Model: ';
+                property_element.appendChild(model_label);
+
+                const model_dropdown = document.createElement('select');
+                model_dropdown.id = 'model-dropdown';
+                for (const [key] of model_map) {
+                    const option_element = document.createElement('option');
+                    option_element.value = key;
+                    option_element.text = key;
+                    model_dropdown.appendChild(option_element);
+                }
+                property_element.appendChild(model_dropdown);
+
+                // TODO: let user adjust position, scale, rotation, etc.
+                // Lots of appendChild nightmare
+
+                const position_div = create_vec_div('Position: ', 'object-pos', vec3(0.0, 0.0, 0.0));
+                property_element.append(position_div);
+
+                const rotation_div = create_vec_div('Axis: ', 'object-rotation', vec3(0.0, 1.0, 0.0));
+                property_element.append(rotation_div);
+
+                const rotation_angle = document.createElement('input');
+                rotation_angle.type = 'number';
+                rotation_angle.value = 0;
+                rotation_angle.id = 'rotation-angle';
+                const rotation_angle_label = document.createElement('label');
+                rotation_angle_label.for = 'rotation-angle';
+                rotation_angle_label.innerText = 'Angle: ';
+                property_element.appendChild(rotation_angle_label);
+                property_element.appendChild(rotation_angle);
+
+                const scale_input = document.createElement('input');
+                scale_input.type = 'number';
+                scale_input.id = 'object-scale';
+                scale_input.value = 1.0;
+                const scale_input_label = document.createElement('label');
+                scale_input_label.for = 'object-scale';
+                scale_input_label.innerText = 'Scale: ';
+                property_element.appendChild(scale_input_label);
+                property_element.appendChild(scale_input);
+
+                const create_button = document.createElement('button');
+                create_button.id = 'create_button';
+                create_button.innerText = 'Add';
+                create_button.onclick = () => {
+                    let name = name_input.value;
+
+                    // generate random name if empty string is input or the name already exists
+                    if(name === '' || scene.get(name) != null) {
+                        name = 'random';
+                    }
+
+                    const new_object = {
+                        lerp: {
+                            enabled: false,
+                            start_abs: vec3(0.0, 0.0, 0.0),
+                            end_abs: vec3(0.0, 1.0, 0.0),
+                            rate: 2.0,
+                            time: 0.0,
+                            multiplier: 1.0
+                        },
+                        name: name,
+                        type: 'object',
+                        meshes: model_map.get(model_dropdown.value),
+                        transform: {
+                            scale: scale_input.value,
+                            position: vecdiv_to_vec(position_div, false),
+                            rotation: {
+                                enabled: false,
+                                angle: 0.0,     // FIXME: PROBLEM WHEN REPLACING THIS WITH rotation_angle.value for some reason
+                                axis: vecdiv_to_vec(rotation_div, true)
+                            }
+                        }
+                    }
+
+                    scene.set(name, new_object);
+                    const new_option = document.createElement('option');
+                    new_option.text = name;
+                    new_option.value = name;
+                    scene_list.append(new_option);
+                };
+                property_element.appendChild(create_button);
+
+            }
+            break;
+
+        case 'object':
+            {
+                const name = document.createElement('p');
+                name.id = 'item-name';
+                name.innerText = scene_object.name + ':';
+                property_element.appendChild(name);
+
+
+                const position_div = create_vec_div('Position: ', 'object-pos', scene_object.transform.position);
+                const rotation_div = create_vec_div('Axis: ', 'object-rotation', scene_object.transform.rotation.axis);
+                const scale_input = document.createElement('input');
+                scale_input.type = 'number';
+                scale_input.value = scene_object.transform.scale;
+                scale_input.id = 'scale-input';
+                const scale_input_label = document.createElement('label');
+                scale_input_label.for = 'scale-input';
+                scale_input_label.innerText = 'Scale: ';
+
+                property_element.appendChild(position_div);
+                property_element.appendChild(rotation_div);
+                property_element.appendChild(scale_input_label);
+                property_element.appendChild(scale_input);
+
+                const lerp_checkbox = document.createElement('input');
+                lerp_checkbox.id = 'lerp-checkbox';
+                lerp_checkbox.type = 'checkbox';
+                lerp_checkbox.checked = scene_object.lerp.enabled;
+                lerp_checkbox.onclick = () => {scene_object.lerp.enabled = lerp_checkbox.checked};
+                const lerp_checkbox_label = document.createElement('label');
+                lerp_checkbox_label.for = 'lerp-checkbox';
+                lerp_checkbox_label.innerText = 'Lerp:';
+                property_element.appendChild(lerp_checkbox_label);
+                property_element.appendChild(lerp_checkbox);
+
+                const rotate_checkbox = document.createElement('input');
+                rotate_checkbox.id = 'rotate-checkbox';
+                rotate_checkbox.type = 'checkbox';
+                rotate_checkbox.checked = scene_object.transform.rotation.enabled;
+                rotate_checkbox.onclick = () => {scene_object.transform.rotation.enabled = rotate_checkbox.checked};
+                const rotate_checkbox_label = document.createElement('label');
+                rotate_checkbox_label.for = 'rotate-checkbox';
+                rotate_checkbox_label.innerText = 'Rotate: ';
+                property_element.appendChild(rotate_checkbox_label);
+                property_element.appendChild(rotate_checkbox);
+
+                /*if(scene_object.lerp.enabled)
+                {
+                    const start_input = document.createElement('input');
+                    start_input.type = 'number';
+                    start_input.value = '1.0';
+                    const end_input = document.createElement('input');
+                    end_input.type = 'number';
+                    end_input.value = '1.0';
+
+                    property_element.appendChild(start_input);
+                    property_element.appendChild(end_input);
+                }*/
+
+                const update_button = document.createElement('button');
+                update_button.id = 'update-button';
+                update_button.innerText = 'Update';
+                update_button.onclick = () => {
+                    scene_object.transform.position = vecdiv_to_vec(position_div, false);
+                    scene_object.transform.rotation.axis = vecdiv_to_vec(rotation_div, true);
+                    scene_object.transform.scale = scale_input.value;
+                };
+
+                property_element.appendChild(update_button);
+
+                const remove_button = document.createElement('button');
+                remove_button.innerText = 'Remove';
+                remove_button.onclick = () => {
+                    // Delete object from scene
+                    scene.delete(scene_object.name);
+
+                    // Delete object from scene graph menu
+                    const object_option_element = Array.from(scene_list.options).filter((object) => {return object.value === scene_object.name})[0];
+                    object_option_element.remove();
+
+                    // Remove Property Options from Properties Menu
+                    const property_div = document.getElementById('properties');
+                    if(property_div) property_div.remove();
+                    var properties_menu = document.getElementById('properties-menu');
+                    properties_menu.appendChild(generate_properties({type: 'empty'}, null));
+                };
+                property_element.appendChild(remove_button);
+            }
+            break;
+
+        case 'light':
+            {
+                const name = document.createElement('p');
+                name.id = 'item-name';
+                name.innerText = scene_object.name + ':';
+                property_element.appendChild(name);
+
+                const color_picker = document.createElement('input');
+                color_picker.type = 'color';
+                color_picker.id = 'color-picker';
+                color_picker.value = '#ffffff';
+
+                const color_picker_label = document.createElement('label');
+                color_picker_label.for = 'color-picker';
+                color_picker_label.innerText = 'Color: ';
+                property_element.appendChild(color_picker_label);
+                property_element.appendChild(color_picker);
+
+                // Let them change the position of the light
+
+                const position_div = create_vec_div('Position: ', 'light-pos', scene_object.transform.position);
+                property_element.appendChild(position_div);
+
+
+                const update_button = document.createElement('button');
+                update_button.id = 'update-button';
+                update_button.innerText = 'Update';
+                update_button.onclick = () => { 
+                    scene_object.transform.position = vecdiv_to_vec(position_div, false);
+                    
+                    // TODO: Update light rotation so it looks like it points at {0, 0, 0}
+                };
+
+                property_element.appendChild(update_button);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    return property_element;
+}
+
+function create_vec_div(text, id, default_vec)
+{
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.display = 'flex';
+
+    const head = document.createElement('p');
+    head.id = id + '-name';
+    head.innerText = text;
+    head.style.margin = 0;
+    div.appendChild(head);
+
+    const x_input = document.createElement('input');
+    x_input.id = id + '-x';
+    x_input.style.width = '25%';
+    x_input.type = 'number';
+    x_input.value = default_vec[0];
+    const y_input = document.createElement('input');
+    y_input.id = id + '-y';
+    y_input.style.width = '25%';
+    y_input.type = 'number';
+    y_input.value = default_vec[1];
+    const z_input = document.createElement('input');
+    z_input.id = id + '-z';
+    z_input.style.width = '25%';
+    z_input.type = 'number';
+    z_input.value = default_vec[2];
+
+    div.appendChild(x_input);
+    div.appendChild(y_input);
+    div.appendChild(z_input);
+
+    return div;
+}
+
+function vecdiv_to_vec(vec_div, assert_nonzero)
+{
+    let vec = vec3(vec_div.children[1].value, vec_div.children[2].value, vec_div.children[3].value);
+    if(assert_nonzero && (vec[0] + vec[1] + vec[2]) == 0.0) vec = vec3(0.0, 1.0, 0.0);
+    return vec;
 }
