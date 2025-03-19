@@ -5,7 +5,6 @@
     Ask about Normal Mapping and how to generate binormal and tangents
     Ask about making shadows less pixelated
     Set up light model so it points in direction of light
-    Set up HTML so you can move light
 */
 
 
@@ -241,10 +240,10 @@ function main()
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
-                position: vec3(0.0, 2.0, 2.0),
+                position: vec3(0.0, 2.0, 1.0),
                 rotation: {
                     enabled: false,
-                    angle: 0.0,
+                    angle: 90.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
@@ -440,8 +439,8 @@ function main()
         var spotlight;
         if(spotlight = scene.get('spotlight'))
         {
-            lightspace_mat = mult(shadow_projection, lookAt(vec3(0.0, 3.0, 1.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
-            gl.uniform3f(light_pos_loc, 0.0, 3.0, 1.0);
+            lightspace_mat = mult(shadow_projection, lookAt(spotlight.transform.position, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
+            gl.uniform3fv(light_pos_loc, flatten(spotlight.transform.position));
         }
 
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
@@ -683,6 +682,32 @@ function generate_properties(scene_object, scene_list)
                 // TODO: let user adjust position, scale, rotation, etc.
                 // Lots of appendChild nightmare
 
+                const position_div = create_vec_div('Position: ', 'object-pos', vec3(0.0, 0.0, 0.0));
+                property_element.append(position_div);
+
+                const rotation_div = create_vec_div('Axis: ', 'object-rotation', vec3(0.0, 1.0, 0.0));
+                property_element.append(rotation_div);
+
+                const rotation_angle = document.createElement('input');
+                rotation_angle.type = 'number';
+                rotation_angle.value = 0;
+                rotation_angle.id = 'rotation-angle';
+                const rotation_angle_label = document.createElement('label');
+                rotation_angle_label.for = 'rotation-angle';
+                rotation_angle_label.innerText = 'Angle: ';
+                property_element.appendChild(rotation_angle_label);
+                property_element.appendChild(rotation_angle);
+
+                const scale_input = document.createElement('input');
+                scale_input.type = 'number';
+                scale_input.id = 'object-scale';
+                scale_input.value = 1.0;
+                const scale_input_label = document.createElement('label');
+                scale_input_label.for = 'object-scale';
+                scale_input_label.innerText = 'Scale: ';
+                property_element.appendChild(scale_input_label);
+                property_element.appendChild(scale_input);
+
                 const create_button = document.createElement('button');
                 create_button.id = 'create_button';
                 create_button.innerText = 'Add';
@@ -696,7 +721,7 @@ function generate_properties(scene_object, scene_list)
 
                     const new_object = {
                         lerp: {
-                            enabled: true,
+                            enabled: false,
                             start_abs: vec3(0.0, 0.0, 0.0),
                             end_abs: vec3(0.0, 1.0, 0.0),
                             rate: 2.0,
@@ -707,12 +732,12 @@ function generate_properties(scene_object, scene_list)
                         type: 'object',
                         meshes: model_map.get(model_dropdown.value),
                         transform: {
-                            scale: 1.0,
-                            position: vec3(0.0, 0.0, 0.2),
+                            scale: scale_input.value,
+                            position: vecdiv_to_vec(position_div, false),
                             rotation: {
-                                enabled: true,
-                                angle: 0.0,
-                                axis: vec3(0.0, 1.0, 0.0)
+                                enabled: false,
+                                angle: 0.0,     // FIXME: PROBLEM WHEN REPLACING THIS WITH rotation_angle.value for some reason
+                                axis: vecdiv_to_vec(rotation_div, true)
                             }
                         }
                     }
@@ -735,16 +760,43 @@ function generate_properties(scene_object, scene_list)
                 name.innerText = scene_object.name + ':';
                 property_element.appendChild(name);
 
-                /*const checkbox = document.createElement('input');
-                checkbox.id = 'object-checkbox';
-                checkbox.type = 'checkbox';
-                checkbox.checked = scene_object.lerp.enabled;
-                checkbox.onclick = () => {scene_object.lerp.enabled = checkbox.checked;};
-                const checkbox_label = document.createElement('label');
-                checkbox_label.for = 'object-checkbox';
-                checkbox_label.innerText = 'Lerp:';
-                property_element.appendChild(checkbox_label);
-                property_element.appendChild(checkbox);*/
+
+                const position_div = create_vec_div('Position: ', 'object-pos', scene_object.transform.position);
+                const rotation_div = create_vec_div('Axis: ', 'object-rotation', scene_object.transform.rotation.axis);
+                const scale_input = document.createElement('input');
+                scale_input.type = 'number';
+                scale_input.value = scene_object.transform.scale;
+                scale_input.id = 'scale-input';
+                const scale_input_label = document.createElement('label');
+                scale_input_label.for = 'scale-input';
+                scale_input_label.innerText = 'Scale: ';
+
+                property_element.appendChild(position_div);
+                property_element.appendChild(rotation_div);
+                property_element.appendChild(scale_input_label);
+                property_element.appendChild(scale_input);
+
+                const lerp_checkbox = document.createElement('input');
+                lerp_checkbox.id = 'lerp-checkbox';
+                lerp_checkbox.type = 'checkbox';
+                lerp_checkbox.checked = scene_object.lerp.enabled;
+                lerp_checkbox.onclick = () => {scene_object.lerp.enabled = lerp_checkbox.checked};
+                const lerp_checkbox_label = document.createElement('label');
+                lerp_checkbox_label.for = 'lerp-checkbox';
+                lerp_checkbox_label.innerText = 'Lerp:';
+                property_element.appendChild(lerp_checkbox_label);
+                property_element.appendChild(lerp_checkbox);
+
+                const rotate_checkbox = document.createElement('input');
+                rotate_checkbox.id = 'rotate-checkbox';
+                rotate_checkbox.type = 'checkbox';
+                rotate_checkbox.checked = scene_object.transform.rotation.enabled;
+                rotate_checkbox.onclick = () => {scene_object.transform.rotation.enabled = rotate_checkbox.checked};
+                const rotate_checkbox_label = document.createElement('label');
+                rotate_checkbox_label.for = 'rotate-checkbox';
+                rotate_checkbox_label.innerText = 'Rotate: ';
+                property_element.appendChild(rotate_checkbox_label);
+                property_element.appendChild(rotate_checkbox);
 
                 /*if(scene_object.lerp.enabled)
                 {
@@ -759,8 +811,19 @@ function generate_properties(scene_object, scene_list)
                     property_element.appendChild(end_input);
                 }*/
 
+                const update_button = document.createElement('button');
+                update_button.id = 'update-button';
+                update_button.innerText = 'Update';
+                update_button.onclick = () => {
+                    scene_object.transform.position = vecdiv_to_vec(position_div, false);
+                    scene_object.transform.rotation.axis = vecdiv_to_vec(rotation_div, true);
+                    scene_object.transform.scale = scale_input.value;
+                };
+
+                property_element.appendChild(update_button);
+
                 const remove_button = document.createElement('button');
-                remove_button.innerText = 'remove';
+                remove_button.innerText = 'Remove';
                 remove_button.onclick = () => {
                     // Delete object from scene
                     scene.delete(scene_object.name);
@@ -798,6 +861,21 @@ function generate_properties(scene_object, scene_list)
                 property_element.appendChild(color_picker);
 
                 // Let them change the position of the light
+
+                const position_div = create_vec_div('Position: ', 'light-pos', scene_object.transform.position);
+                property_element.appendChild(position_div);
+
+
+                const update_button = document.createElement('button');
+                update_button.id = 'update-button';
+                update_button.innerText = 'Update';
+                update_button.onclick = () => { 
+                    scene_object.transform.position = vecdiv_to_vec(position_div, false);
+                    
+                    // TODO: Update light rotation so it looks like it points at {0, 0, 0}
+                };
+
+                property_element.appendChild(update_button);
             }
             break;
 
@@ -806,4 +884,46 @@ function generate_properties(scene_object, scene_list)
     }
 
     return property_element;
+}
+
+function create_vec_div(text, id, default_vec)
+{
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.display = 'flex';
+
+    const head = document.createElement('p');
+    head.id = id + '-name';
+    head.innerText = text;
+    head.style.margin = 0;
+    div.appendChild(head);
+
+    const x_input = document.createElement('input');
+    x_input.id = id + '-x';
+    x_input.style.width = '25%';
+    x_input.type = 'number';
+    x_input.value = default_vec[0];
+    const y_input = document.createElement('input');
+    y_input.id = id + '-y';
+    y_input.style.width = '25%';
+    y_input.type = 'number';
+    y_input.value = default_vec[1];
+    const z_input = document.createElement('input');
+    z_input.id = id + '-z';
+    z_input.style.width = '25%';
+    z_input.type = 'number';
+    z_input.value = default_vec[2];
+
+    div.appendChild(x_input);
+    div.appendChild(y_input);
+    div.appendChild(z_input);
+
+    return div;
+}
+
+function vecdiv_to_vec(vec_div, assert_nonzero)
+{
+    let vec = vec3(vec_div.children[1].value, vec_div.children[2].value, vec_div.children[3].value);
+    if(assert_nonzero && (vec[0] + vec[1] + vec[2]) == 0.0) vec = vec3(0.0, 1.0, 0.0);
+    return vec;
 }
