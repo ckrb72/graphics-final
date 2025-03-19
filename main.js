@@ -206,8 +206,11 @@ function main()
         const scene_object = {
             lerp: {
                 enabled: false,
-                start: vec3(0.0, 0.0, 0.0),
-                end: vec3(0.0, 0.0, 0.0)
+                start_abs: vec3(0.0, 0.0, 0.0),
+                end_abs: vec3(0.0, 1.0, 0.0),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
             },
             name: 'Table',
             type: 'object',
@@ -216,6 +219,7 @@ function main()
                 scale: 0.1,
                 position: vec3(0.0, -0.7, 0.0),
                 rotation: {
+                    enabled: false,
                     angle: -90.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
@@ -239,6 +243,7 @@ function main()
                 scale: 0.01,
                 position: vec3(0.0, 2.0, 2.0),
                 rotation: {
+                    enabled: false,
                     angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
@@ -256,8 +261,11 @@ function main()
         const scene_object = {
             lerp: {
                 enabled: true,
-                start: vec3(0.0, 0.0, 0.0),
-                end: vec3(0.0, 0.0, 0.0)
+                start_abs: vec3(0.0, 0.15, 0.2),
+                end_abs: vec3(0.0, 0.6, 0.2),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
             },
             name: 'book',
             type: 'object',
@@ -266,6 +274,7 @@ function main()
                 scale: 0.001,
                 position: vec3(0.0, 0.0, 0.2),
                 rotation: {
+                    enabled: true,
                     angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
@@ -283,8 +292,11 @@ function main()
         const scene_object = {
             lerp: {
                 enabled: false,
-                start: vec3(0.0, 0.0, 0.0),
-                end: vec3(0.0, 0.0, 0.0)
+                start_abs: vec3(0.0, 0.0, 0.0),
+                end_abs: vec3(0.0, 1.0, 0.0),
+                rate: 2.0,
+                time: 0.0,
+                multiplier: 1.0
             },
             name: 'floor',
             type: 'object',
@@ -293,6 +305,7 @@ function main()
                 scale: 0.01,
                 position: vec3(0.95, -0.7, 0.0),
                 rotation: {
+                    enabled: false,
                     angle: -90.0,
                     axis: vec3(1.0, 0.0, 0.0)
                 }
@@ -326,9 +339,6 @@ function main()
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    var lerp_time = 0.0;
-    var lerp_multiplier = 1.0;
-    var lerp_rate = 2.0;    // How long lerp should take in seconds
     var previous_time = Date.now();
     var delta = 0.0;
     var render = function()
@@ -369,24 +379,19 @@ function main()
             }
         }
 
-        var book;
-        if(book = scene.get('book'))
+        // Update all objects
+        for (const [key, object] of scene)
         {
-            book.transform.rotation.angle += 10.0 * delta;
-            book.transform.position[1] = lerp(0.1, 0.5, lerp_time / lerp_rate);
-            lerp_time += delta * lerp_multiplier;
-            if(lerp_time >= lerp_rate)
-            {
-                lerp_time = lerp_rate;
-                lerp_multiplier = -lerp_multiplier;
-            }
-            else if(lerp_time <= 0.0)
-            {
-                lerp_time = 0.0;
-                lerp_multiplier = -lerp_multiplier;
-            }
+            if(object.type !== 'object') continue;
+
+            // Rotate
+            if(object.transform.rotation.enabled) object.transform.rotation.angle += 20.0 * delta;
+
+            // Lerp
+            if(object.lerp.enabled) lerp(object, delta);
         }
 
+        // Render Shadow Map
         gl.bindFramebuffer(gl.FRAMEBUFFER, shadow_framebuffer);
         gl.viewport(0, 0, shadow_map_width, shadow_map_height);
         gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -424,6 +429,7 @@ function main()
 
         gl.disableVertexAttribArray(shadow_pos_loc);
 
+        // Render Scene
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -487,7 +493,7 @@ function main()
         gl.disableVertexAttribArray(tex_attrib);
 
 
-        // Post-processing stage
+        // Post-Processing
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -615,9 +621,26 @@ function find_uuid(arr, uuid)
     })[0];
 }
 
-function lerp(a, b, time)
+function lerp_vec3(a, b, time)
 {
-    return (b - a) * time + a;
+    // fancy way of doing lerp = (b - a) * time + a;
+    return add(a, scale(time, subtract(b, a)));
+}
+
+function lerp(scene_object, delta)
+{
+    scene_object.transform.position = lerp_vec3(scene_object.lerp.start_abs, scene_object.lerp.end_abs, scene_object.lerp.time / scene_object.lerp.rate);
+    scene_object.lerp.time += delta * scene_object.lerp.multiplier;
+    if(scene_object.lerp.time >= scene_object.lerp.rate)
+    {
+        scene_object.lerp.time = scene_object.lerp.rate;
+        scene_object.lerp.multiplier = -scene_object.lerp.multiplier;
+    }
+    else if(scene_object.lerp.time <= 0.0)
+    {
+        scene_object.lerp.time = 0.0;
+        scene_object.lerp.multiplier = -scene_object.lerp.multiplier;
+    }
 }
 
 function generate_properties(scene_object, scene_list)
@@ -657,6 +680,9 @@ function generate_properties(scene_object, scene_list)
                 }
                 property_element.appendChild(model_dropdown);
 
+                // TODO: let user adjust position, scale, rotation, etc.
+                // Lots of appendChild nightmare
+
                 const create_button = document.createElement('button');
                 create_button.id = 'create_button';
                 create_button.innerText = 'Add';
@@ -667,27 +693,29 @@ function generate_properties(scene_object, scene_list)
                     if(name === '' || scene.get(name) != null) {
                         name = 'random';
                     }
-                    
+
                     const new_object = {
                         lerp: {
-                            enabled: false,
-                            start: vec3(0.0, 0.0, 0.0),
-                            end: vec3(0.0, 0.0, 0.0)
+                            enabled: true,
+                            start_abs: vec3(0.0, 0.0, 0.0),
+                            end_abs: vec3(0.0, 1.0, 0.0),
+                            rate: 2.0,
+                            time: 0.0,
+                            multiplier: 1.0
                         },
                         name: name,
                         type: 'object',
                         meshes: model_map.get(model_dropdown.value),
-
-                        // TODO: set transform up
                         transform: {
-                            scale: 0.01,
-                            position: vec3(0.95, -0.7, 0.0),
+                            scale: 1.0,
+                            position: vec3(0.0, 0.0, 0.2),
                             rotation: {
-                                angle: -90.0,
-                                axis: vec3(1.0, 0.0, 0.0)
+                                enabled: true,
+                                angle: 0.0,
+                                axis: vec3(0.0, 1.0, 0.0)
                             }
                         }
-                    };
+                    }
 
                     scene.set(name, new_object);
                     const new_option = document.createElement('option');
@@ -768,6 +796,8 @@ function generate_properties(scene_object, scene_list)
                 color_picker_label.innerText = 'Color: ';
                 property_element.appendChild(color_picker_label);
                 property_element.appendChild(color_picker);
+
+                // Let them change the position of the light
             }
             break;
 
