@@ -64,6 +64,7 @@
             lightspace_proj = lightspace_proj * 0.5 + 0.5;
             float in_shadow = lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy).r ? 1.0 : 0.0;
 
+            //final_color = texture(normal_map, f_tex);
             final_color = vec4((ambient_tex * 0.2) + (1.0 - in_shadow) * diffuse, 1.0);
         }
     </script>
