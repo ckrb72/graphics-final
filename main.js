@@ -178,10 +178,12 @@ function main()
     var grayscale_shader = initShaders(gl, 'square-vertex', 'grayscale-fragment');
     var inverted_shader = initShaders(gl, 'square-vertex', 'invert-fragment');
     var blur_shader = initShaders(gl, 'square-vertex', 'blur-fragment');
+    var edge_detection_shader = initShaders(gl, 'square-vertex', 'edge-detection-fragment');
 
     shader_map.set('grayscale', grayscale_shader);
     shader_map.set('invert', inverted_shader);
     shader_map.set('blur', blur_shader);
+    shader_map.set('edge-detection', edge_detection_shader);
 
     var post_process = document.getElementById('post-process-dropdown');
     post_process.addEventListener('change', () => {
@@ -340,6 +342,8 @@ function main()
 
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    gl.enable(gl.CULL_FACE);
 
     var previous_time = Date.now();
     var delta = 0.0;
