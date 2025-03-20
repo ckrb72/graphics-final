@@ -21,7 +21,7 @@ function main()
     const canvas = document.getElementById('webgl-canvas');
 
     const aspect_ratio = 16.0 / 9.0;
-    canvas.width = window.innerWidth * 0.75;
+    canvas.width = window.innerWidth / 1.5;
     canvas.height = canvas.width * (1 / aspect_ratio);
 
     canvas.addEventListener("click", () => {
@@ -176,9 +176,11 @@ function main()
 
     var grayscale_shader = initShaders(gl, 'square-vertex', 'grayscale-fragment');
     var inverted_shader = initShaders(gl, 'square-vertex', 'invert-fragment');
+    var blur_shader = initShaders(gl, 'square-vertex', 'blur-fragment');
 
     shader_map.set('grayscale', grayscale_shader);
     shader_map.set('invert', inverted_shader);
+    shader_map.set('blur', blur_shader);
 
     var post_process = document.getElementById('post-process-dropdown');
     post_process.addEventListener('change', () => {
@@ -927,3 +929,22 @@ function vecdiv_to_vec(vec_div, assert_nonzero)
     if(assert_nonzero && (vec[0] + vec[1] + vec[2]) == 0.0) vec = vec3(0.0, 1.0, 0.0);
     return vec;
 }
+
+// make a renderpass function that you can chain
+// i.e. do grayscale then blur then edge detection or something like that
+
+const renderpasses = [{framebuffer: 'framebuffer object here', shader: 'shader object here'}, {framebuffer: 'framebuffer object here', shader: 'shader object here'}];
+
+/*
+    for(renderpass of renderpasses)
+    {
+        bind renderpass.framebuffer
+        bind renderpass.shader
+
+        set up renderpass uniforms (can maybe make assumption that they will all have a sampler and texcoords)
+
+        draw renderpass
+    }
+
+    draw to default framebuffer for output
+*/
