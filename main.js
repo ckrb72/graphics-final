@@ -31,6 +31,7 @@ function main()
     var input_map = new Map();
 
     window.addEventListener("keydown", (event) => {
+        if (document.pointerLockElement === canvas && event.key === ' ') event.preventDefault();
         input_map.set(event.key.toLowerCase(), 1);
     });
 
