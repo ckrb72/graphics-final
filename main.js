@@ -178,6 +178,7 @@ function main()
     var grayscale_shader = initShaders(gl, 'square-vertex', 'grayscale-fragment');
     var inverted_shader = initShaders(gl, 'square-vertex', 'invert-fragment');
     var blur_shader = initShaders(gl, 'square-vertex', 'blur-fragment');
+    var blur_axis_loc = gl.getUniformLocation(blur_shader, 'blur_axis');
     var edge_detection_shader = initShaders(gl, 'square-vertex', 'edge-detection-fragment');
 
     shader_map.set('grayscale', grayscale_shader);
@@ -343,7 +344,18 @@ function main()
     // Have to do this since the image data is flipped when loading from the json
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    gl.enable(gl.CULL_FACE);
+    // Create blur framebuffers (need to do this because we need to do an extra pass (x-direction) and then a y-direction blur)
+    let blur_framebuffer = gl.createFramebuffer();
+    let blur_color_attachment = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, blur_color_attachment);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, blur_framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blur_color_attachment, 0);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) { alert('framebuffer not good'); console.log('framebuffer status failed');}
+
 
     var previous_time = Date.now();
     var delta = 0.0;
@@ -500,6 +512,30 @@ function main()
 
 
         // Post-Processing
+
+        if(post_process.value === 'blur')
+        {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, blur_framebuffer);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.useProgram(selected_shader);
+            gl.uniform1i(blur_axis_loc, 0);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, color_attachment);
+            gl.bindBuffer(gl.ARRAY_BUFFER, square_buffer);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, square_index_buffer);
+
+            gl.enableVertexAttribArray(square_pos_attrib);
+            gl.enableVertexAttribArray(square_tex_attrib);
+
+            gl.vertexAttribPointer(square_pos_attrib, 2, gl.FLOAT, false, 4 * 4, 0);
+            gl.vertexAttribPointer(square_tex_attrib, 2, gl.FLOAT, false, 4 * 4, 2 * 4);
+            gl.drawElements(gl.TRIANGLES, square_indices.length, gl.UNSIGNED_INT, 0);
+
+            gl.disableVertexAttribArray(square_pos_attrib);
+            gl.disableVertexAttribArray(square_tex_attrib);
+        }
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
@@ -507,7 +543,15 @@ function main()
         gl.useProgram(selected_shader);
 
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, color_attachment);
+        if(post_process.value === 'blur')
+        {
+            gl.bindTexture(gl.TEXTURE_2D, blur_color_attachment);
+            gl.uniform1i(blur_axis_loc, 1);
+        }
+        else
+        {
+            gl.bindTexture(gl.TEXTURE_2D, color_attachment);
+        }
 
         gl.bindBuffer(gl.ARRAY_BUFFER, square_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, square_index_buffer);
@@ -521,9 +565,6 @@ function main()
 
         gl.disableVertexAttribArray(square_pos_attrib);
         gl.disableVertexAttribArray(square_tex_attrib);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
 
         setTimeout( () => { window.requestAnimationFrame(render) }, 0);
@@ -938,7 +979,6 @@ function vecdiv_to_vec(vec_div, assert_nonzero)
 // make a renderpass function that you can chain
 // i.e. do grayscale then blur then edge detection or something like that
 
-const renderpasses = [{framebuffer: 'framebuffer object here', shader: 'shader object here'}, {framebuffer: 'framebuffer object here', shader: 'shader object here'}];
 
 /*
     for(renderpass of renderpasses)
