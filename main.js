@@ -1,9 +1,7 @@
 /*
     TODO:
-    Finish post-processing (blur and edge detection)
-    Add specular lighting
     Ask about Normal Mapping and how to generate binormal and tangents
-    Ask about making shadows less pixelated
+    Make light a spotlight instead of a directional light (also add attenuation)
     Set up light model so it points in direction of light
 */
 
@@ -87,12 +85,13 @@ function main()
     var projection_loc = gl.getUniformLocation(program, "projection");
     var view_loc = gl.getUniformLocation(program, "view");
 
-    var ambient_map_loc = gl.getUniformLocation(program, "ambient_map");
+    var item_texture_loc = gl.getUniformLocation(program, "item_texture");
     var normal_map_loc = gl.getUniformLocation(program, "normal_map");
     var norm_matrix_loc = gl.getUniformLocation(program, "norm_matrix");
     var light_pos_loc = gl.getUniformLocation(program, "light_pos");
     var light_space_loc = gl.getUniformLocation(program, "light_space_mat");
     var shadow_map_loc = gl.getUniformLocation(program, "shadow_map");
+    var cam_pos_loc = gl.getUniformLocation(program, "cam_pos");
 
     var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
     var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
@@ -100,7 +99,7 @@ function main()
     var shadow_pos_loc = gl.getAttribLocation(shadow_program, "v_pos");
 
     gl.useProgram(program);
-    gl.uniform1i(ambient_map_loc, 0);
+    gl.uniform1i(item_texture_loc, 0);
     gl.uniform1i(normal_map_loc, 1);
     gl.uniform1i(shadow_map_loc, 2);
 
@@ -130,8 +129,8 @@ function main()
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
 
     // Create Shadow Map
-    const shadow_map_width = 4098;
-    const shadow_map_height = 4098;
+    const shadow_map_width = 2048;
+    const shadow_map_height = 2048;
     var shadow_map = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, shadow_map);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, shadow_map_width, shadow_map_height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
@@ -140,7 +139,8 @@ function main()
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
-    var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
+    //var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
+    var shadow_projection = perspective(90.0, shadow_map_width / shadow_map_height, 1.0, 7.5);
     var shadow_view = lookAt(vec3(0.0, 1.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
 
     var lightspace_mat = mult(shadow_projection, shadow_view);
@@ -420,7 +420,7 @@ function main()
             {
                 // Bind Textures (assuming only ambient and normal maps)
                 gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.item_tex);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
         
@@ -453,6 +453,7 @@ function main()
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
         gl.uniformMatrix4fv(view_loc, false, flatten(camera));
         gl.uniformMatrix4fv(light_space_loc, false, flatten(lightspace_mat));
+        gl.uniform3fv(cam_pos_loc, flatten(cam_pos));
 
         // Bind shadow map for sampling in fragment shader
         gl.activeTexture(gl.TEXTURE2);
@@ -477,7 +478,7 @@ function main()
             {
                 // Bind Textures (assuming only ambient and normal maps)
                 gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, mesh.ambient_map);
+                gl.bindTexture(gl.TEXTURE_2D, mesh.item_tex);
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, mesh.normal_map);
     
@@ -608,7 +609,7 @@ async function parse_model(path, gl)
             norm_buf: norm_buf,
             uv_buf: uv_buf,
             normal_map: normal_tex,
-            ambient_map: ambient_tex
+            item_tex: ambient_tex
         });
 
         return meshes;
