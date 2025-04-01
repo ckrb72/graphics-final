@@ -78,22 +78,19 @@
             vec3 lightspace_proj = f_pos_lightspace.xyz / f_pos_lightspace.w;
             lightspace_proj = lightspace_proj * 0.5 + 0.5;  // Convert lightspace coord from [-1, 1] to [0, 1] so we can compare to sampler
 
-            // Calculate average of shadow in 3x3 matrix with current pixel in center
-            /*float shadow_average = 0.0;
-            for(int i = -1; i < 2; i++)
+            // Percentage Closer Filtering for soft shadows
+            // Calculate average of shadow in 5x5 matrix with current pixel in center
+            float shadow_average = 0.0;
+            for(int i = -2; i < 3; i++)
             {
-                for(int j = -1; j < 2; j++)
+                for(int j = -2; j < 3; j++)
                 {
-                    shadow_average += texture(shadow_map, lightspace_proj.xy + vec2(offsets.x * float(j), offsets.y * float(i))).r;
+                    shadow_average += lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy + vec2(offsets.x * float(j), offsets.y * float(i))).r ? 0.0 : 1.0;
                 }
             }
-            shadow_average /= 9.0;*/
+            shadow_average /= 25.0;
 
-            float shadow_coefficient = texture(shadow_map, lightspace_proj.xy).r;
-
-            float in_shadow = lightspace_proj.z - 0.005 > shadow_coefficient ? 1.0 : 0.0;
-
-            final_color = vec4(ambient + (1.0 - in_shadow) * (diffuse + specular), 1.0);
+            final_color = vec4(ambient + (shadow_average * (diffuse + specular)), 1.0);
         }
     </script>
 
