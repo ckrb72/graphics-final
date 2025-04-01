@@ -2,6 +2,7 @@
     TODO:
     Ask about Normal Mapping and how to generate binormal and tangents
     Make light a spotlight instead of a directional light (also add attenuation)
+    Add Percentage Closer Filtering
     Set up light model so it points in direction of light
 */
 
