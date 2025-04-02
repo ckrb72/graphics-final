@@ -134,8 +134,8 @@ function main()
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) console.log('framebuffer status failed');
 
     // Create Shadow Map
-    const shadow_map_width = 2048;
-    const shadow_map_height = 2048;
+    const shadow_map_width = 4096;
+    const shadow_map_height = 4096;
     var shadow_map = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, shadow_map);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT32F, shadow_map_width, shadow_map_height, 0, gl.DEPTH_COMPONENT, gl.FLOAT, null);
