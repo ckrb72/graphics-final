@@ -95,6 +95,7 @@ function main()
     var light_constant_loc = gl.getUniformLocation(program, "light.constant_factor");
     var light_linear_loc = gl.getUniformLocation(program, "light.linear_factor");
     var light_quadratic_loc = gl.getUniformLocation(program, "light.quadratic_factor");
+    var light_color_loc = gl.getUniformLocation(program, "light_color");
 
     var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
     var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
@@ -246,6 +247,7 @@ function main()
         const scene_object = {
             name: 'spotlight',
             type: 'light',
+            color: vec3(1.0, 1.0, 1.0),
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
@@ -466,6 +468,7 @@ function main()
             gl.uniform1f(light_constant_loc, 1.0);
             gl.uniform1f(light_linear_loc, 0.09);
             gl.uniform1f(light_quadratic_loc, 0.032);
+            gl.uniform3fv(light_color_loc, spotlight.color);
         }
 
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
@@ -908,6 +911,18 @@ function generate_properties(scene_object, scene_list)
                 color_picker.type = 'color';
                 color_picker.id = 'color-picker';
                 color_picker.value = '#ffffff';
+                color_picker.addEventListener('change', () => {
+                    let color_hex = color_picker.value;
+                    let red_hex = color_picker.value[1] + color_picker.value[2];
+                    let green_hex = color_picker.value[3] + color_picker.value[4];
+                    let blue_hex = color_picker.value[5] + color_picker.value[6];
+
+                    // Convert hex to floats
+                    let red = parseInt(red_hex, 16) / 256;
+                    let green = parseInt(green_hex, 16) / 256;
+                    let blue = parseInt(blue_hex, 16) / 256;
+                    scene_object.color = vec3(red, green, blue);
+                });
 
                 const color_picker_label = document.createElement('label');
                 color_picker_label.for = 'color-picker';
@@ -1012,21 +1027,3 @@ function vecdiv_to_vec(vec_div, assert_nonzero)
     if(assert_nonzero && (vec[0] + vec[1] + vec[2]) == 0.0) vec = vec3(0.0, 1.0, 0.0);
     return vec;
 }
-
-// make a renderpass function that you can chain
-// i.e. do grayscale then blur then edge detection or something like that
-
-
-/*
-    for(renderpass of renderpasses)
-    {
-        bind renderpass.framebuffer
-        bind renderpass.shader
-
-        set up renderpass uniforms (can maybe make assumption that they will all have a sampler and texcoords)
-
-        draw renderpass
-    }
-
-    draw to default framebuffer for output
-*/
