@@ -3,6 +3,7 @@
     Ask about Normal Mapping and how to generate binormal and tangents
     Make light a spotlight instead of a directional light
     Set up light model so it points in direction of light
+    Fix lerping
 */
 
 
@@ -248,6 +249,7 @@ function main()
             name: 'spotlight',
             type: 'light',
             color: vec3(1.0, 1.0, 1.0),
+            attenuation: vec3(1.0, 0.09, 0.032),
             meshes: model_map.get('spotlight'),
             transform: {
                 scale: 0.01,
@@ -465,9 +467,9 @@ function main()
         {
             lightspace_mat = mult(shadow_projection, lookAt(spotlight.transform.position, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
             gl.uniform3fv(light_pos_loc, flatten(spotlight.transform.position));
-            gl.uniform1f(light_constant_loc, 1.0);
-            gl.uniform1f(light_linear_loc, 0.09);
-            gl.uniform1f(light_quadratic_loc, 0.032);
+            gl.uniform1f(light_constant_loc, spotlight.attenuation[0]);
+            gl.uniform1f(light_linear_loc, spotlight.attenuation[1]);
+            gl.uniform1f(light_quadratic_loc, spotlight.attenuation[2]);
             gl.uniform3fv(light_color_loc, spotlight.color);
         }
 
@@ -774,7 +776,10 @@ function generate_properties(scene_object, scene_list)
 
                     // generate random name if empty string is input or the name already exists
                     if(name === '' || scene.get(name) != null) {
-                        name = 'random';
+
+                        // Random string generation from https://www.programiz.com/javascript/examples/generate-random-strings
+                        const random_suffix = Math.random().toString(36).substring(6, 10);
+                        name = 'obj-' + random_suffix;
                     }
 
                     const new_object = {
@@ -912,7 +917,6 @@ function generate_properties(scene_object, scene_list)
                 color_picker.id = 'color-picker';
                 color_picker.value = '#ffffff';
                 color_picker.addEventListener('change', () => {
-                    let color_hex = color_picker.value;
                     let red_hex = color_picker.value[1] + color_picker.value[2];
                     let green_hex = color_picker.value[3] + color_picker.value[4];
                     let blue_hex = color_picker.value[5] + color_picker.value[6];
@@ -929,6 +933,9 @@ function generate_properties(scene_object, scene_list)
                 color_picker_label.innerText = 'Color: ';
                 property_element.appendChild(color_picker_label);
                 property_element.appendChild(color_picker);
+
+                const attenuation_div = create_vec_div('Attenuation: ', 'attenutation-div', scene_object.attenuation);
+                property_element.appendChild(attenuation_div);
 
                 // Let them change the position of the light
 
