@@ -53,6 +53,16 @@
         uniform vec3 light_pos;
         uniform vec3 cam_pos;   // world space camera position
 
+        // helpful struct for all light stuff
+        struct light_props 
+        {
+            float constant_factor;
+            float linear_factor;
+            float quadratic_factor;
+        };
+
+        uniform light_props light;
+
         out vec4 final_color;
         void main()
         {
@@ -75,6 +85,11 @@
             vec3 halfway_dir = normalize(view_dir + light_dir);
             vec3 specular = tex_color * pow(max(dot(norm, halfway_dir), 0.0), 256.0);
 
+            // Attenuation
+            float light_distance = length(light_pos - f_pos);
+            float attenuation = 1.0 / (light.constant_factor + (light.linear_factor * light_distance) + (light.quadratic_factor * light_distance * light_distance));
+
+            // Shadows
             vec3 lightspace_proj = f_pos_lightspace.xyz / f_pos_lightspace.w;
             lightspace_proj = lightspace_proj * 0.5 + 0.5;  // Convert lightspace coord from [-1, 1] to [0, 1] so we can compare to sampler
 
@@ -90,7 +105,7 @@
             }
             shadow_average /= 25.0;
 
-            final_color = vec4(ambient + (shadow_average * (diffuse + specular)), 1.0);
+            final_color = vec4(attenuation * (ambient + (shadow_average * (diffuse + specular))), 1.0);
         }
     </script>
 

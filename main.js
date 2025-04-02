@@ -1,8 +1,7 @@
 /*
     TODO:
     Ask about Normal Mapping and how to generate binormal and tangents
-    Make light a spotlight instead of a directional light (also add attenuation)
-    Add Percentage Closer Filtering
+    Make light a spotlight instead of a directional light
     Set up light model so it points in direction of light
 */
 
@@ -93,6 +92,9 @@ function main()
     var light_space_loc = gl.getUniformLocation(program, "light_space_mat");
     var shadow_map_loc = gl.getUniformLocation(program, "shadow_map");
     var cam_pos_loc = gl.getUniformLocation(program, "cam_pos");
+    var light_constant_loc = gl.getUniformLocation(program, "light.constant_factor");
+    var light_linear_loc = gl.getUniformLocation(program, "light.linear_factor");
+    var light_quadratic_loc = gl.getUniformLocation(program, "light.quadratic_factor");
 
     var shadow_program = initShaders(gl, 'shadow-vertex', 'passthrough-fragment');
     var shadow_model_loc = gl.getUniformLocation(shadow_program, "model");
@@ -141,7 +143,7 @@ function main()
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
     //var shadow_projection = ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5);
-    var shadow_projection = perspective(90.0, shadow_map_width / shadow_map_height, 1.0, 7.5);
+    var shadow_projection = perspective(150.0, shadow_map_width / shadow_map_height, 1.0, 7.5);
     var shadow_view = lookAt(vec3(0.0, 1.0, 2.0), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
 
     var lightspace_mat = mult(shadow_projection, shadow_view);
@@ -250,7 +252,7 @@ function main()
                 position: vec3(0.0, 2.0, 1.0),
                 rotation: {
                     enabled: false,
-                    angle: 90.0,
+                    angle: 0.0,
                     axis: vec3(0.0, 1.0, 0.0)
                 }
             }
@@ -461,6 +463,9 @@ function main()
         {
             lightspace_mat = mult(shadow_projection, lookAt(spotlight.transform.position, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0)));
             gl.uniform3fv(light_pos_loc, flatten(spotlight.transform.position));
+            gl.uniform1f(light_constant_loc, 1.0);
+            gl.uniform1f(light_linear_loc, 0.09);
+            gl.uniform1f(light_quadratic_loc, 0.032);
         }
 
         gl.uniformMatrix4fv(projection_loc, false, flatten(projection));
@@ -920,9 +925,39 @@ function generate_properties(scene_object, scene_list)
                 update_button.id = 'update-button';
                 update_button.innerText = 'Update';
                 update_button.onclick = () => { 
-                    scene_object.transform.position = vecdiv_to_vec(position_div, false);
+
+                    // Remove message if already displayed
+                    let error_div = document.getElementById('light-error-message');
+                    if(error_div) property_element.removeChild(error_div);
+
+                    let position_vec = vecdiv_to_vec(position_div, 0);
+
+                    // Just check to make sure the position vec isn't <0.0, 1.0, 0.0> so the look direction
+                    // doesn't become parallel to the up vector of the light and crash the program
+                    if((position_vec[0] == 0.0) && (position_vec[1] % 1.0 === 0.0) && (position_vec[2] == 0.0))
+                    {
+                        position_vec[2] = 1.0;
+                        position_div.children[3].value = 1;
+
+                        // Display error message
+                        const light_error_message = document.createElement('p');
+                        light_error_message.innerText = 'ERROR: Light Sources Cannot Be Placed At (0, k, 0) Where k Is Any Number. Placing Light At (0, k, 1) Instead';
+                        light_error_message.id = 'light-error-message';
+                        property_element.appendChild(light_error_message);
+                    }
+
+                    scene_object.transform.position = position_vec;
                     
                     // TODO: Update light rotation so it looks like it points at {0, 0, 0}
+                    /*let pos = scene_object.transform.position;
+                    let up_dir = vec3(0.0, 1.0, 0.0);
+                    let axis = normalize(cross(pos, up_dir));
+
+                    let norm_pos = normalize(vec3(-pos[0], -pos[1], -pos[2]));
+                    let angle = 0.0;
+
+                    scene_object.transform.rotation.angle = angle;
+                    scene_object.transform.rotation.axis = vec3(0.0, 1.0, 0.0);*/
                 };
 
                 property_element.appendChild(update_button);
