@@ -1,6 +1,5 @@
 /*
     TODO:
-    Ask about Normal Mapping and how to generate binormal and tangents
     Set up light model so it points in direction of light
     Fix lerping
 */
@@ -80,6 +79,9 @@ function main()
     var pos_attrib = gl.getAttribLocation(program, "v_pos");
     var norm_attrib = gl.getAttribLocation(program, "v_norm");
     var tex_attrib = gl.getAttribLocation(program, "v_tex");
+    var tangent_attrib = gl.getAttribLocation(program, "v_tangent");
+    var bitangent_attrib = gl.getAttribLocation(program, "v_bitangent");
+
 
     var model_loc = gl.getUniformLocation(program, "model");
     var projection_loc = gl.getUniformLocation(program, "projection");
@@ -484,6 +486,8 @@ function main()
         gl.enableVertexAttribArray(pos_attrib);
         gl.enableVertexAttribArray(norm_attrib);
         gl.enableVertexAttribArray(tex_attrib);
+        gl.enableVertexAttribArray(3);
+        gl.enableVertexAttribArray(4);
 
         // Render each model in the scene
         for(const [id, object] of scene)
@@ -511,6 +515,10 @@ function main()
                 gl.vertexAttribPointer(norm_attrib, 3, gl.FLOAT, false, 3 * 4, 0);
                 gl.bindBuffer(gl.ARRAY_BUFFER, mesh.uv_buf);
                 gl.vertexAttribPointer(tex_attrib, 2, gl.FLOAT, false, 2 * 4, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.tangent_buf);
+                gl.vertexAttribPointer(3, 3, gl.FLOAT, false, 3 * 4, 0);
+                gl.bindBuffer(gl.ARRAY_BUFFER, mesh.bitangent_buf);
+                gl.vertexAttribPointer(4, 3, gl.FLOAT, false, 3 * 4, 0);
     
                 // Draw
                 gl.drawArrays(gl.TRIANGLES, 0, mesh.vert_count);
@@ -520,6 +528,8 @@ function main()
         gl.disableVertexAttribArray(pos_attrib);
         gl.disableVertexAttribArray(norm_attrib);
         gl.disableVertexAttribArray(tex_attrib);
+        gl.disableVertexAttribArray(3);
+        gl.disableVertexAttribArray(4);
 
 
         // Post-Processing
@@ -622,7 +632,15 @@ async function parse_model(path, gl)
     
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        let tangent_arr = new Float32Array(geometry.data.attributes.tangent.array);
+        let tangent_arr = new Float32Array(clean_tangents(geometry.data.attributes.tangent.array));
+        let tangent_buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, tangent_buf);
+        gl.bufferData(gl.ARRAY_BUFFER, tangent_arr, gl.STATIC_DRAW);
+
+        let bitangent_arr = new Float32Array(calculate_bitangents(norm_arr, tangent_arr));
+        let bitangent_buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bitangent_buf);
+        gl.bufferData(gl.ARRAY_BUFFER, bitangent_arr, gl.STATIC_DRAW);
 
         // Load Textures
 
@@ -663,8 +681,8 @@ async function parse_model(path, gl)
             vert_count: json.geometries[0].data.attributes.position.array.length / 3,
             pos_buf: pos_buf,
             norm_buf: norm_buf,
-            //tangent_buf: tangent_buf,
-            //bitangent_buf: bitangent_buf,
+            tangent_buf: tangent_buf,
+            bitangent_buf: bitangent_buf,
             uv_buf: uv_buf,
             normal_map: normal_tex,
             item_tex: ambient_tex
@@ -676,6 +694,42 @@ async function parse_model(path, gl)
     {
         console.error(error.message);
     }
+}
+
+// Tangents are given as vec4. This strips them to be vec3
+function clean_tangents(tangent)
+{
+    let tangent_arr = [];
+    let tangent_count = tangent.length / 4;
+
+    for(let i = 0; i < tangent_count; i++)
+    {
+        tangent_arr.push(tangent[(4 * i)]);
+        tangent_arr.push(tangent[(4 * i) + 1]);
+        tangent_arr.push(tangent[(4 * i) + 2]);
+    }
+
+    return tangent_arr;
+}
+
+function calculate_bitangents(norm, tangent)
+{
+    let bitangent_arr = [];
+    let vec_count = norm.length / 3;
+
+    for(let i = 0; i < vec_count; i++)
+    {
+        let tangent_vec = vec3(tangent[(3 * i)], tangent[(3 * i) + 1], tangent[(3 * i) + 2]);
+        let normal_vec = vec3(norm[(3 * i)], norm[(3 * i) + 1], norm[(3 * i) + 2]);
+        let bitangent_vec = flatten(cross(tangent_vec, normal_vec));
+
+        bitangent_arr.push(bitangent_vec[0]);
+        bitangent_arr.push(bitangent_vec[1]);
+        bitangent_arr.push(bitangent_vec[2]);
+    }
+
+
+    return bitangent_arr;
 }
 
 

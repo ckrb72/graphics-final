@@ -14,6 +14,8 @@
         layout(location = 0) in vec3 v_pos;
         layout(location = 1) in vec3 v_norm;
         layout(location = 2) in vec2 v_tex;
+        layout(location = 3) in vec3 v_tangent;
+        layout(location = 4) in vec3 v_bitangent;
 
         uniform mat4 projection;
         uniform mat4 view;
@@ -25,6 +27,7 @@
         out vec3 f_norm;
         out vec2 f_tex;
         out vec4 f_pos_lightspace;
+        out mat3 TBN_matrix;
 
         void main()
         {
@@ -33,6 +36,11 @@
             f_norm = mat3(norm_matrix) * v_norm;      // Transform normals to world space
             f_tex = v_tex;
             f_pos_lightspace = light_space_mat * vec4(f_pos, 1.0);
+
+            vec3 tangent = normalize(vec3(model * vec4(v_tangent, 0.0)));
+            vec3 bitangent = normalize(vec3(model * vec4(v_bitangent, 0.0)));
+            vec3 normal = normalize(vec3(model * vec4(v_norm, 0.0)));
+            TBN_matrix = mat3(tangent, bitangent, normal);
         }
     </script>
 
@@ -45,6 +53,7 @@
         in vec3 f_norm;
         in vec2 f_tex;
         in vec4 f_pos_lightspace;
+        in mat3 TBN_matrix;
 
         uniform sampler2D item_texture;
         uniform sampler2D normal_map;
@@ -70,7 +79,11 @@
             vec2 offsets = 1.0 / vec2(textureSize(shadow_map, 0));
 
             vec3 tex_color = vec3(texture(item_texture, f_tex));
-            vec3 norm = normalize(f_norm);
+            //vec3 norm = normalize(f_norm);
+
+            vec3 norm = vec3(texture(normal_map, f_tex));
+            norm = (norm - 0.5) * 2.0;
+            norm = normalize(TBN_matrix * norm);
             vec3 light_dir = normalize(light_pos - f_pos);
 
             vec3 ambient = 0.2 * tex_color;
