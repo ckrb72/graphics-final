@@ -300,7 +300,7 @@ function main()
         scene_graph_menu.appendChild(new_option);
     });
 
-    parse_model("./floor.json", gl).then((meshes) => {
+    parse_model("./Plane.json", gl).then((meshes) => {
         model_map.set('floor', meshes);
         const scene_object = {
             lerp: {
@@ -315,8 +315,8 @@ function main()
             type: 'object',
             meshes: model_map.get('floor'),
             transform: {
-                scale: 0.01,
-                position: vec3(0.95, -0.7, 0.0),
+                scale: 1.0,
+                position: vec3(0.0, -0.7, 0.0),
                 rotation: {
                     enabled: false,
                     angle: -90.0,
