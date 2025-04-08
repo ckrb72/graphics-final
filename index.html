@@ -37,9 +37,13 @@
             f_tex = v_tex;
             f_pos_lightspace = light_space_mat * vec4(f_pos, 1.0);
 
-            vec3 tangent = normalize(vec3(model * vec4(v_tangent, 0.0)));
-            vec3 bitangent = normalize(vec3(model * vec4(v_bitangent, 0.0)));
-            vec3 normal = normalize(vec3(model * vec4(v_norm, 0.0)));
+            //vec3 tangent = normalize(vec3(model * vec4(v_tangent, 0.0)));
+            //vec3 bitangent = normalize(vec3(model * vec4(v_bitangent, 0.0)));
+            //vec3 normal = normalize(vec3(model * vec4(v_norm, 0.0)));
+
+            vec3 tangent = normalize(mat3(norm_matrix) * v_tangent);
+            vec3 bitangent = normalize(mat3(norm_matrix) * v_bitangent);
+            vec3 normal = normalize(f_norm);
             TBN_matrix = mat3(tangent, bitangent, normal);
         }
     </script>
