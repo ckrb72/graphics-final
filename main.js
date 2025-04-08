@@ -1,7 +1,6 @@
 /*
     TODO:
     Ask about Normal Mapping and how to generate binormal and tangents
-    Make light a spotlight instead of a directional light
     Set up light model so it points in direction of light
     Fix lerping
 */
@@ -606,19 +605,24 @@ async function parse_model(path, gl)
         var material = find_uuid(json.materials, current_object.material);
 
         // Load buffers
+        let pos_arr = new Float32Array(geometry.data.attributes.position.array);
         var pos_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, pos_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.position.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, pos_arr, gl.STATIC_DRAW);
     
+        let norm_arr = new Float32Array(geometry.data.attributes.normal.array);
         var norm_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, norm_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.normal.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, norm_arr, gl.STATIC_DRAW);
     
+        let uv_arr = new Float32Array(geometry.data.attributes.uv.array);
         var uv_buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, uv_buf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(geometry.data.attributes.uv.array), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, uv_arr, gl.STATIC_DRAW);
     
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        
+        let tangent_arr = new Float32Array(geometry.data.attributes.tangent.array);
 
         // Load Textures
 
@@ -659,6 +663,8 @@ async function parse_model(path, gl)
             vert_count: json.geometries[0].data.attributes.position.array.length / 3,
             pos_buf: pos_buf,
             norm_buf: norm_buf,
+            //tangent_buf: tangent_buf,
+            //bitangent_buf: bitangent_buf,
             uv_buf: uv_buf,
             normal_map: normal_tex,
             item_tex: ambient_tex
