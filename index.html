@@ -118,12 +118,19 @@
             {
                 for(int j = -2; j < 3; j++)
                 {
-                    shadow_average += lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy + vec2(offsets.x * float(j), offsets.y * float(i))).r ? 0.0 : 1.0;
+                    // If depth is outside of shadow frustum, then it is never in shadow
+                    if(lightspace_proj.z > 1.0)
+                        shadow_average += 1.0;
+
+                    // Otherwise, figure out if it is in shadow or not
+                    else
+                        // If depth > shadow_map_depth then it is in shadow, else it isn't
+                        shadow_average += lightspace_proj.z - 0.005 > texture(shadow_map, lightspace_proj.xy + vec2(offsets.x * float(j), offsets.y * float(i))).r ? 0.0 : 1.0;
                 }
             }
             shadow_average /= 25.0;
 
-            final_color = vec4(attenuation *  (ambient + (shadow_average * light_color * (diffuse + specular))), 1.0);
+            final_color = vec4(attenuation * light_color * (ambient + (shadow_average * (diffuse + specular))), 1.0);
             //final_color = vec4(norm, 1.0);
         }
     </script>

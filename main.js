@@ -2,6 +2,7 @@
     TODO:
     Set up light model so it points in direction of light
     Fix lerping
+    Fix shadow map so it isn't completely dark when outside of shadow frustum
 */
 
 
@@ -799,7 +800,6 @@ function generate_properties(scene_object, scene_list)
                 }
                 property_element.appendChild(model_dropdown);
 
-                // TODO: let user adjust position, scale, rotation, etc.
                 // Lots of appendChild nightmare
 
                 const position_div = create_vec_div('Position: ', 'object-pos', vec3(0.0, 0.0, 0.0));
@@ -859,7 +859,7 @@ function generate_properties(scene_object, scene_list)
                             position: vecdiv_to_vec(position_div, false),
                             rotation: {
                                 enabled: false,
-                                angle: 0.0,     // FIXME: PROBLEM WHEN REPLACING THIS WITH rotation_angle.value for some reason
+                                angle: 0.0,
                                 axis: vecdiv_to_vec(rotation_div, true)
                             }
                         }
