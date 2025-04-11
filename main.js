@@ -177,7 +177,7 @@ function main()
     });
 
     
-    var cam_radius = 5.0;
+    var cam_radius = 6.0;
     var selected_shader = none_shader;
     const shader_map = new Map();
     shader_map.set('none', none_shader);
