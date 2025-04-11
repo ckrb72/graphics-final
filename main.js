@@ -1,8 +1,6 @@
 /*
     TODO:
-    Set up light model so it points in direction of light
     Fix lerping
-    Fix shadow map so it isn't completely dark when outside of shadow frustum
 */
 
 
@@ -258,8 +256,8 @@ function main()
                 position: vec3(0.0, 2.0, 1.0),
                 rotation: {
                     enabled: false,
-                    angle: 0.0,
-                    axis: vec3(0.0, 1.0, 0.0)
+                    y_axis_angle: 180.0,
+                    x_axis_angle: -63.43494882292201
                 }
             }
         }
@@ -432,7 +430,17 @@ function main()
         {
             // Create Model Matrix
             let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
-            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            
+            // Not using axis angle representation for lights since I couldn't figure out the math :(
+            if(object.type === 'light')
+            {
+                model_mat = mult(rotateY(object.transform.rotation.y_axis_angle), model_mat);
+                model_mat = mult(rotateX(object.transform.rotation.x_axis_angle), model_mat);
+            }
+            else
+            {
+                model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            }
             model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
             gl.uniformMatrix4fv(shadow_model_loc, false, flatten(model_mat));
     
@@ -495,8 +503,19 @@ function main()
         {
             // Create Model Matrix
             let model_mat = scalem(object.transform.scale, object.transform.scale, object.transform.scale);
-            model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
-            model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
+            
+            // Not using axis angle representation for lights since I couldn't figure out the math :(
+            if(object.type === 'light')
+            {
+                model_mat = mult(rotateY(object.transform.rotation.y_axis_angle), model_mat);
+                model_mat = mult(rotateX(object.transform.rotation.x_axis_angle), model_mat);
+            }
+            else
+            {
+                model_mat = mult(rotate(object.transform.rotation.angle, object.transform.rotation.axis), model_mat);
+            }
+            
+                model_mat = mult(translate(object.transform.position[0], object.transform.position[1], object.transform.position[2]), model_mat);
             gl.uniformMatrix4fv(model_loc, false, flatten(model_mat));
             gl.uniformMatrix4fv(norm_matrix_loc, false, flatten(inverse4(transpose(model_mat))));
 
@@ -1030,16 +1049,13 @@ function generate_properties(scene_object, scene_list)
 
                     scene_object.transform.position = position_vec;
                     
-                    // TODO: Update light rotation so it looks like it points at {0, 0, 0}
-                    /*let pos = scene_object.transform.position;
-                    let up_dir = vec3(0.0, 1.0, 0.0);
-                    let axis = normalize(cross(pos, up_dir));
+                    // Update light direction so it points at 0, 0, 0
+                    let pos = scene_object.transform.position;
+                    let y_axis_angle = Math.atan2(pos[0], pos[2]);
 
-                    let norm_pos = normalize(vec3(-pos[0], -pos[1], -pos[2]));
-                    let angle = 0.0;
-
-                    scene_object.transform.rotation.angle = angle;
-                    scene_object.transform.rotation.axis = vec3(0.0, 1.0, 0.0);*/
+                    let x_axis_angle = Math.atan2(pos[1], pos[2]);
+                    scene_object.transform.rotation.y_axis_angle = (y_axis_angle * 180.0 / Math.PI) + 180.0;
+                    scene_object.transform.rotation.x_axis_angle = -(x_axis_angle * 180.0 / Math.PI);
                 };
 
                 property_element.appendChild(update_button);
