@@ -1,9 +1,3 @@
-/*
-    TODO:
-    Fix lerping
-*/
-
-
 // Holds all the models we want.
 // Doing it this way so we can have many objects reuse one model (may be overkill for this project but I might allow for multiple lights so this would be helpful)
 // map of id -> model (array of meshes)
@@ -216,8 +210,8 @@ function main()
         const scene_object = {
             lerp: {
                 enabled: false,
-                start_abs: vec3(0.0, 0.0, 0.0),
-                end_abs: vec3(0.0, 1.0, 0.0),
+                start_abs: vec3(0.0, -1.7, 0.0),
+                end_abs: vec3(0.0, 0.3, 0.0),
                 rate: 2.0,
                 time: 0.0,
                 multiplier: 1.0
@@ -304,8 +298,8 @@ function main()
         const scene_object = {
             lerp: {
                 enabled: false,
-                start_abs: vec3(0.0, 0.0, 0.0),
-                end_abs: vec3(0.0, 1.0, 0.0),
+                start_abs: vec3(0.0, -1.7, 0.0),
+                end_abs: vec3(0.0, 0.3, 0.0),
                 rate: 2.0,
                 time: 0.0,
                 multiplier: 1.0
@@ -918,6 +912,11 @@ function generate_properties(scene_object, scene_list)
                 property_element.appendChild(scale_input_label);
                 property_element.appendChild(scale_input);
 
+                const lerp_start = create_vec_div('Start: ', 'lerp-start', scene_object.lerp.start_abs);
+                const lerp_end = create_vec_div('End', 'lerp-end', scene_object.lerp.end_abs);
+                property_element.appendChild(lerp_start);
+                property_element.appendChild(lerp_end);
+
                 const lerp_checkbox = document.createElement('input');
                 lerp_checkbox.id = 'lerp-checkbox';
                 lerp_checkbox.type = 'checkbox';
@@ -940,19 +939,6 @@ function generate_properties(scene_object, scene_list)
                 property_element.appendChild(rotate_checkbox_label);
                 property_element.appendChild(rotate_checkbox);
 
-                /*if(scene_object.lerp.enabled)
-                {
-                    const start_input = document.createElement('input');
-                    start_input.type = 'number';
-                    start_input.value = '1.0';
-                    const end_input = document.createElement('input');
-                    end_input.type = 'number';
-                    end_input.value = '1.0';
-
-                    property_element.appendChild(start_input);
-                    property_element.appendChild(end_input);
-                }*/
-
                 const update_button = document.createElement('button');
                 update_button.id = 'update-button';
                 update_button.innerText = 'Update';
@@ -960,6 +946,8 @@ function generate_properties(scene_object, scene_list)
                     scene_object.transform.position = vecdiv_to_vec(position_div, false);
                     scene_object.transform.rotation.axis = vecdiv_to_vec(rotation_div, true);
                     scene_object.transform.scale = scale_input.value;
+                    scene_object.lerp.start_abs = vecdiv_to_vec(lerp_start, false);
+                    scene_object.lerp.end_abs = vecdiv_to_vec(lerp_end, false);
                 };
 
                 property_element.appendChild(update_button);
@@ -1106,7 +1094,7 @@ function create_vec_div(text, id, default_vec)
 
 function vecdiv_to_vec(vec_div, assert_nonzero)
 {
-    let vec = vec3(vec_div.children[1].value, vec_div.children[2].value, vec_div.children[3].value);
+    let vec = vec3(parseFloat(vec_div.children[1].value), parseFloat(vec_div.children[2].value), parseFloat(vec_div.children[3].value));
     if(assert_nonzero && (vec[0] + vec[1] + vec[2]) == 0.0) vec = vec3(0.0, 1.0, 0.0);
     return vec;
 }
