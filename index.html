@@ -44,6 +44,7 @@
             vec3 tangent = normalize(mat3(norm_matrix) * v_tangent);
             vec3 bitangent = normalize(mat3(norm_matrix) * v_bitangent);
             vec3 normal = normalize(f_norm);
+            // TBN changes from tangent space to model space then to world space
             TBN_matrix = mat3(tangent, bitangent, normal);
         }
     </script>
@@ -278,6 +279,75 @@
             }
 
             final_color = vec4(result, 1.0);
+        }
+
+    </script>
+
+
+    <script id="raymarch-vertex" type="text">#version 300 es
+
+        layout(location = 0) in vec2 v_pos;
+
+        void main()
+        {
+            gl_Position = vec4(v_pos, 0.0, 1.0);
+        }
+
+    </script>
+
+    <script id="raymarch-fragment" type="text">#version 300 es
+        precision mediump float;
+
+        uniform vec2 resolution;
+        uniform vec3 cam_pos;
+        uniform vec3 cam_dir;
+
+        out vec4 final_color;
+
+        float sphere_sdf(vec3 point, float radius)
+        {
+            return length(point) - radius;
+        }
+
+        #define MAX_STEPS 75
+        const float STEP_SIZE = 0.08;
+        vec3 raymarch(vec3 ray_origin, vec3 ray_direction)
+        {
+            float depth = 0.0;
+            vec3 point = ray_origin + depth * ray_direction;
+
+            for(int i = 0; i < MAX_STEPS; i++)
+            {
+                // If we hit the sphere at all then return white
+                if(sphere_sdf(point, 0.5) < 0.0)
+                    return vec3(1.0);
+                
+                depth += STEP_SIZE;
+                point = ray_origin + depth * ray_direction;
+            }
+
+            // Didn't hit sphere so return black
+            return vec3(0.0);
+        }
+
+        void main()
+        {
+            // Convert [(0, 0), (WIDTH, HEIGHT)] to [(0, 0), (1, 1)] range
+            vec2 uv = gl_FragCoord.xy / resolution;
+
+            // convert [(0, 0), (1, 1)] range to [(-1, -1), (1, 1)] range
+            uv = uv * 2.0 - 1.0;
+
+            // Account for aspect ratio
+            uv.x *= resolution.x / resolution.y;
+
+
+            vec3 ray_direction = normalize(cam_dir + vec3(uv, 0.0));
+            if(abs(ray_direction.x - cam_dir.x) < 0.003)
+                final_color = vec4(0.0, 1.0, 1.0, 1.0);
+            else
+                final_color = vec4(vec3(0.0), 1.0);
+            //final_color = vec4(raymarch(cam_pos, ray_direction), 1.0);
         }
 
     </script>

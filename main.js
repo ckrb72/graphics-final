@@ -357,6 +357,12 @@ function main()
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blur_color_attachment, 0);
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) { alert('framebuffer not good'); console.log('framebuffer status failed');}
 
+    var raymarch_shader = initShaders(gl, 'raymarch-vertex', 'raymarch-fragment');
+    var resolution_loc = gl.getUniformLocation(raymarch_shader, 'resolution');
+    var raymarch_cam_pos = gl.getUniformLocation(raymarch_shader, 'cam_pos');
+    var raymarch_cam_dir = gl.getUniformLocation(raymarch_shader, 'cam_dir');
+    gl.useProgram(raymarch_shader);
+    gl.uniform2fv(resolution_loc, new Float32Array([canvas.width, canvas.height]));
 
     var previous_time = Date.now();
     var delta = 0.0;
@@ -576,6 +582,9 @@ function main()
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
 
         gl.useProgram(selected_shader);
+        //gl.useProgram(raymarch_shader);
+        //gl.uniform3fv(raymarch_cam_pos, flatten(cam_pos));
+        // gl.uniform3fv(raymarch_cam_dir, flatten(cam_dir));
 
         gl.activeTexture(gl.TEXTURE0);
         if(post_process.value === 'blur')
