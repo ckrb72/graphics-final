@@ -304,6 +304,60 @@
 
         out vec4 final_color;
 
+        float random (vec3 point) {
+            return fract(sin(dot(point.xyz,
+                                 vec3(12.9898,78.233,90.121)))*
+                43758.5453123);
+        }
+        
+        float noise(vec3 point)
+        {
+            vec3 i = floor(point);
+            vec3 f = fract(point);
+            
+            vec3 u = f * f * (3.0 - 2.0 * f);
+            
+            float at = random(i);
+            float ab = random(i + vec3(0.0, 0.0, 1.0));
+            
+            float bt = random(i + vec3(0.0, 1.0, 0.0));
+            float bb = random(i + vec3(0.0, 1.0, 1.0));
+            
+            float ct = random(i + vec3(1.0, 0.0, 0.0));
+            float cb = random(i + vec3(1.0, 0.0, 1.0));
+            
+            float dt = random(i + vec3(1.0, 1.0, 0.0));
+            float db = random(i + vec3(1.0, 1.0, 1.0));
+            
+            float alpha = mix(at, ab, u.z);
+            float beta = mix(bt, bb, u.z);
+            float gamma = mix(alpha, beta, u.y);
+            
+            float epsilon = mix(ct, cb, u.z);
+            float delta = mix(dt, db, u.z);
+            float phi = mix(epsilon, delta, u.y);
+            
+            return mix(gamma, phi, u.x);
+        }
+
+        #define NUM_OCTAVES 5
+        float fbm(vec3 point)
+        {
+            float value = 0.0;
+            float amplitude = 0.5;
+            float frequency = 1.0;
+
+            for(int i = 0; i < NUM_OCTAVES; i++)
+            {
+                value += amplitude * noise(point);
+                point *= 2.0;
+                amplitude *= 0.5;
+            }
+
+            return value;
+        }
+        
+
         float sphere_sdf(vec3 point, float radius)
         {
             return length(point) - radius;
@@ -320,7 +374,7 @@
             {
                 // If we hit the sphere at all then return white
                 if(sphere_sdf(point, 0.5) < 0.0)
-                    return vec3(1.0);
+                    return vec3(fbm(point * 5.0));
                 
                 depth += STEP_SIZE;
                 point = ray_origin + depth * ray_direction;
@@ -341,13 +395,14 @@
             // Account for aspect ratio
             uv.x *= resolution.x / resolution.y;
 
+            vec3 forward = normalize(cam_dir);
+            vec3 temp_up = vec3(0.0, 1.0, 0.0);
+            vec3 cam_right = cross(forward, temp_up);
+            vec3 cam_up = cross(cam_right, forward);
+            float focal_length = 2.0;
 
-            vec3 ray_direction = normalize(cam_dir + vec3(uv, 0.0));
-            if(abs(ray_direction.x - cam_dir.x) < 0.003)
-                final_color = vec4(0.0, 1.0, 1.0, 1.0);
-            else
-                final_color = vec4(vec3(0.0), 1.0);
-            //final_color = vec4(raymarch(cam_pos, ray_direction), 1.0);
+            vec3 ray_direction = normalize(forward * focal_length + uv.x * cam_right + uv.y * cam_up);
+            final_color = vec4(raymarch(cam_pos, ray_direction), 1.0);
         }
 
     </script>

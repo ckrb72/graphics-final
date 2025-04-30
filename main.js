@@ -584,7 +584,7 @@ function main()
         gl.useProgram(selected_shader);
         //gl.useProgram(raymarch_shader);
         //gl.uniform3fv(raymarch_cam_pos, flatten(cam_pos));
-        // gl.uniform3fv(raymarch_cam_dir, flatten(cam_dir));
+        //gl.uniform3fv(raymarch_cam_dir, flatten(cam_dir));
 
         gl.activeTexture(gl.TEXTURE0);
         if(post_process.value === 'blur')
