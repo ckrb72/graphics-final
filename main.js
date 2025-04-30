@@ -361,6 +361,7 @@ function main()
     var resolution_loc = gl.getUniformLocation(raymarch_shader, 'resolution');
     var raymarch_cam_pos = gl.getUniformLocation(raymarch_shader, 'cam_pos');
     var raymarch_cam_dir = gl.getUniformLocation(raymarch_shader, 'cam_dir');
+    var raymarch_frame_tex = gl.getUniformLocation(raymarch_shader, "frame_tex");
     gl.useProgram(raymarch_shader);
     gl.uniform2fv(resolution_loc, new Float32Array([canvas.width, canvas.height]));
 
@@ -581,10 +582,10 @@ function main()
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         //gl.clearColor(0.3, 0.3, 0.3, 1.0);
 
-        gl.useProgram(selected_shader);
-        //gl.useProgram(raymarch_shader);
-        //gl.uniform3fv(raymarch_cam_pos, flatten(cam_pos));
-        //gl.uniform3fv(raymarch_cam_dir, flatten(cam_dir));
+        //gl.useProgram(selected_shader);
+        gl.useProgram(raymarch_shader);
+        gl.uniform3fv(raymarch_cam_pos, flatten(cam_pos));
+        gl.uniform3fv(raymarch_cam_dir, flatten(cam_dir));
 
         gl.activeTexture(gl.TEXTURE0);
         if(post_process.value === 'blur')
