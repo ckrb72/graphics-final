@@ -363,25 +363,39 @@
             return length(point) - radius;
         }
 
-        #define MAX_STEPS 75
+        float ellipsoid_sdf( vec3 p, vec3 r )
+        {
+          float k0 = length(p/r);
+          float k1 = length(p/(r*r));
+          return k0*(k0-1.0)/k1;
+        }
+
+        #define MAX_STEPS 100
         const float STEP_SIZE = 0.08;
         vec3 raymarch(vec3 ray_origin, vec3 ray_direction)
         {
             float depth = 0.0;
             vec3 point = ray_origin + depth * ray_direction;
 
+            vec4 result = vec4(0.0);
+
             for(int i = 0; i < MAX_STEPS; i++)
             {
-                // If we hit the sphere at all then return white
-                if(sphere_sdf(point, 0.5) < 0.0)
-                    return vec3(fbm(point * 5.0));
+
+                float density = -ellipsoid_sdf(point, vec3(2.0, 0.4, 2.0)) + fbm(point * 2.5);
+                if(density > 0.0)
+                {
+                    vec4 color = vec4(mix(vec3(1.0, 1.0, 1.0), vec3(0.0, 0.0, 0.0), density), density);
+                    color.rgb *= color.a;
+                    result += color * (1.0 - result.a);
+                }
                 
                 depth += STEP_SIZE;
                 point = ray_origin + depth * ray_direction;
             }
 
             // Didn't hit sphere so return black
-            return vec3(0.0);
+            return result.rgb;
         }
 
         void main()
